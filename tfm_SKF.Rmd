@@ -40,7 +40,7 @@ require(rmdformats)
 ## Global options
 options(max.print="75")
 opts_chunk$set(echo=params$printcode,
-	             cache=FALSE, # para no reproducir cuando no hay cambios 
+	             cache=TRUE, # para no reproducir cuando no hay cambios 
                prompt=FALSE,
                tidy=TRUE,
                comment=NA,
@@ -111,10 +111,10 @@ Cargamos los arhivos contenidos en "infoClin_all_dataset.RData" y
 dataClin <- load("data/infoClin_all_dataset.RData")
 
 # Cargamos el archivo CRC_stageII.RData 19/03/2024
-#dataCRC <- load("../data/CRC_stageII.RData")
+dataCRC <- load("data/CRC_stageII.RData")
 
 # Cargamos el archivo exp_mat.RData 02/04/2024
-dataCRC <- load("data/exp_mat.RData")
+#dataCRC <- load("data/exp_mat.RData")
 ```
 
 **GSE Files**
