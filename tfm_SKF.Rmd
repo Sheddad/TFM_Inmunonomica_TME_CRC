@@ -1,0 +1,899 @@
+---
+title: "TFM Caracterización inmunonómica del microambiente tumoral en cáncer colorrectal"
+author: "Sheddad Kaid-Salah Ferrón"
+date: "`r format(Sys.Date())`"
+output:
+  html_document:
+    code_folding: hide
+    toc: true
+    toc_float: yes
+    toc_depth: 3
+    theme: simplex #flatly
+    number_sections: true
+    csl: vancouver.csl
+    css: styles.css # Estilos del html. Para aumentar el tamaño de la letra pej.
+  pdf_document:
+    toc: yes
+params:
+  date: !r Sys.Date()
+  printcode:
+    label: "Display Code:"
+    value: TRUE # or set it to FALSE
+  data:
+    label: "Input dataset:"
+    value: data/infoClin_all_dataset.RData
+    input: file
+  folder.data: ""
+  p.train: !r 2/3
+  subtitulo: Código de trabajo
+  seed: 123571113
+nocite: 
+bibliography: referencias_tfm.bib
+geometry: margin=2cm
+---
+
+```{r class.source = 'fold-hide', setup, include=FALSE}
+# Parametrizamos
+require(knitr)
+require(rmdformats)
+
+## Global options
+options(max.print="75")
+opts_chunk$set(echo=params$printcode,
+	             cache=FALSE, # para no reproducir cuando no hay cambios 
+               prompt=FALSE,
+               tidy=TRUE,
+               comment=NA,
+               message=FALSE,
+               warning=FALSE)
+opts_knit$set(width=75)
+Sys.setlocale("LC_TIME", "C")
+```
+
+``` {r paquetes, include=FALSE}
+# Instalamos paquetes, si no lo están, en caso de ser requeridos
+if(!(require(bibtex))) install.packages("bibtex")
+if(!(require(dplyr))) install.packages("dplyr")
+if(!(require(factoextra))) install.packages("factoextra")
+if(!(require(ggplot2))) install.packages("ggplot2")
+if(!(require(knitr))) install.packages("knitr")
+if(!(require(patchwork))) install.packages("patchwork")
+if(!(require(rmdformats))) install.packages("rmdformats")
+if(!(require(skimr))) install.packages("skimr")
+```
+
+``` {r funciones, include=FALSE}
+# Función para transponer un DataFrames
+t_df <- function(df) {
+  # Transponemos el dataframe
+  df_t <- as.data.frame(t(df))
+  
+  # Los nombres de las columnas originales se convierten en nombres de filas
+  rownames(df_t) <- colnames(df)
+  # Los nombres de las filas originales se convierten en nombres de columnas
+  colnames(df_t) <- rownames(df)
+  
+  # Devolvemos el daataframe transpuesto y con los nombres de filas y columnas
+  return(df_t)
+}
+
+# Función para dibujar todos los boxplots de los datos de MCPcounter
+boxplot_MCPcounter <- function(data, x, y, fill, title) {
+  # Cargar ggplot2 si aún no está cargado
+  require(ggplot2)
+  
+  # Crear el boxplot
+  bp <- ggplot(data, aes_string(x = x, y = y, fill = fill)) +
+    geom_boxplot() +
+    scale_fill_brewer(palette = "Pastel1") + # Opcional: Mejora la paleta de colores
+    labs(title = title, x = "", y = "MCPc score") +
+    theme_minimal() +
+    # Añadimos el valor de la media a la gráfica
+    stat_summary(fun = mean, geom = "text", aes(label = round(..y.., digits = 2))
+                 , vjust = -0.5, color = "black") +
+    theme(legend.position = "none", # Omitir la leyenda si `grupo` ya es claro por el color
+          axis.text.x = element_text(angle = 45, hjust = 1)) # Inclinar las etiquetas del eje x
+  
+  # Devolvemos el boxplot
+  return(bp)
+}
+```
+
+-----------------------------------------------------------
+
+# Obtención  y preparación de los datos
+
+Cargamos los arhivos contenidos en "infoClin_all_dataset.RData" y 
+"CRC_stageII.RData" con los contenidos clínicos y de CRC.     
+
+```{r chunck_1_1}
+# Cargamos el archivo infoClin_all_dataset.RData 16/03/2024
+dataClin <- load("data/infoClin_all_dataset.RData")
+
+# Cargamos el archivo CRC_stageII.RData 19/03/2024
+#dataCRC <- load("../data/CRC_stageII.RData")
+
+# Cargamos el archivo exp_mat.RData 02/04/2024
+dataCRC <- load("data/exp_mat.RData")
+```
+
+**GSE Files**
+
+- GSE39582 [@GSE39582_marisa2013gene] 421 vs 585
+- GSE14333 [@GSE14333_jorissen2009metastasis] 185 vs 290
+- GSE13294 [@GSE13294_jorissen2008dna] 121 vs 155
+- GSE17536 [@GSE17536_smith2010experimentally] 111 vs 177
+
+**Platform** [GPL570](https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GPL570): 
+[HG-U133_Plus_2] Affymetrix Human Genome U133 Plus 2.0 Array 
+  
+Fusionamos los datos en un único dataframe al que le añadimos la columna *grupo*
+con los datos *stage* y *msi*.
+
+Factorizamos las variables categóricas y ordenamos por ID tanto los datos 
+clínicos como los de la matriz de expresión. 
+
+Creamos un DataFrame para asignar cada ID a su estudio clínico. A cada estudio 
+le asignamos un color para poder identificarlo fácilmente en los estudios gráficos.
+
+
+
+```{r chunck_1_2}
+# 11/04/2023
+# Utilizamos el paquete "dplyr"
+library(dplyr)
+
+# Función para preparar el data frame con el estudio por ID. También asignaremos 
+# un color a cada estudio
+prepare_df <- function(df, study_name, color) {
+  df %>%
+    select(ID) %>%
+    mutate(study = study_name, color = color)
+}
+
+# Lista de estudios con sus colores asociados
+studies_info <- list(
+  clx = "red",
+  GSE39582 = "blue",
+  GSE14333 = "green",
+  GSE13294 = "orange",
+  GSE17536 = "yellow",
+  TCGA = "violet"
+)
+
+# Creamos una lista de de los estudios utilizando la función prepare_df
+df_studies_list <- lapply(names(studies_info), function(x) {
+  prepare_df(get(paste0(x, "_infoClin")), x, studies_info[[x]])
+})
+
+# Juntamos los df's de la lista se studies en uno solo y lo ordenamos por 'ID'
+df_studies <- bind_rows(df_studies_list) %>% arrange(ID)
+
+# Fusionamos y ordenamos todos los datos clínicos generando "df_dataClin"
+df_dataClin <- bind_rows(
+  lapply(names(studies_info), function(x) get(paste0(x, "_infoClin")))
+) %>% arrange(ID)
+
+# Cramos una nueva columna "grupo" a los "df_dataClin" con los datos de msi y stage
+df_dataClin$grupo <- with(df_dataClin, paste(msi_imputed, stage, sep = " s "))
+
+# Convertimos a factores
+df_dataClin <- df_dataClin %>%
+  mutate(across(c(msi_imputed, cms, stage, grupo), factor))
+
+# Añadimos las columnas "study" y "color" a df_dataClin
+df_dataClin <- left_join(df_dataClin, select(df_studies, ID, study, color), by = "ID")
+
+``` 
+
+Pasamos la matriz de expresión a data_frame y la ordenamos por "ID"
+
+```{r chunck_1_3}
+# Pasamos la matriz de expresión a data frame 26/03/2024
+df_exmat <- as.data.frame(ex)
+
+# Ordenamos la matriz de expresión por nombre de columnas 26/03/2024
+df_exmat <- df_exmat[, order(names(df_exmat))]
+```
+  
+  
+# Exploración de los datos
+
+Resumen exploratorio de los datos:  
+
+```{r chunck_2_1}
+# Hacemos un Summary con el paquete skimr 18/03/2024 
+# install.packages("skimr")
+require(skimr) 
+skim(df_dataClin)
+```
+
+Estadísticas y cálculos para la generación de los gráficos de datos clínicos:  
+
+```{r chunck_2_2}
+# Estadísticas desglosadas 18/03/2024
+# Frecuencias
+msi_frecuencias <- table(df_dataClin$msi_imputed)
+cms_frecuencias <- table(df_dataClin$cms)
+stage_frecuencias <- table(df_dataClin$stage)
+
+# Valores NA
+na_msi <- sum(is.na(df_dataClin$msi_imputed))
+na_cms <- sum(is.na(df_dataClin$cms))
+na_stage <- sum(is.na(df_dataClin$stage))
+
+# Contamos cuantos MSI y MSS tenemos por cada estadio, II y III 19/03/2024
+sII_MSI <- sum(df_dataClin$msi_imputed == "MSI" & df_dataClin$stage == "II")
+sII_MSS <- sum(df_dataClin$msi_imputed == "MSS" & df_dataClin$stage == "II")
+sIII_MSI <- sum(df_dataClin$msi_imputed == "MSI" & df_dataClin$stage == "III")
+sIII_MSS <- sum(df_dataClin$msi_imputed == "MSS" & df_dataClin$stage == "III")
+
+# Crear un dataframe con estos valores
+stage_MSI_MSS_df <- data.frame(
+  Stage_MSI_MSS = c("II_MSI", "II_MSS", "III_MSI", "III_MSS"),
+  Freq = c(sII_MSI, sII_MSS, sIII_MSI, sIII_MSS)
+)
+```
+
+# Análisis de los datos clínicos {.tabset .tabset-fade .tabset-pills}  
+
+## MSI/MSS  
+
+```{r chunck_3_1}
+# Cargamos la librería "ggplot"
+require(ggplot2)
+
+# Pasamos a DataFrame msi
+df_msi_frecuencias <- as.data.frame(msi_frecuencias)
+df_msi_frecuencias
+
+# Añadimos los porcentajes
+# Calculamos el total de frecuencias
+total_frecuencias <- sum(df_msi_frecuencias$Freq)
+# Añadimos una columna de porcentajes al dataframe
+df_msi_frecuencias$Porcentaje <- (df_msi_frecuencias$Freq / total_frecuencias) * 100
+
+# Diagrama de Barras de MSI/MSS
+p1 <- ggplot(df_msi_frecuencias, aes(x = Var1, y = Freq)) +
+  geom_bar(stat = "identity", fill = c("salmon", "seashell3")) +
+  geom_text(aes(label = Freq), vjust = -0.5, size = 3.5) + # Frecuencias arriba de cada barra
+  # Porcentajes en la mitad + o -
+  geom_text(aes(label = paste0(round(Porcentaje, 1), "%")), vjust = 5, size = 3.5) +
+  labs(title = "MSI/MSS", x = "", y = "Frecuencia") +
+  theme_minimal()
+p1
+```
+
+## CMS  
+
+```{r chunck_3_2}
+# Pasamos a DataFrame cms
+df_cms_frecuencias <- as.data.frame(cms_frecuencias)
+df_cms_frecuencias
+
+# Añadimos los porcentajes
+# Calculamos el total de frecuencias
+total_frecuencias <- sum(df_cms_frecuencias$Freq)
+# Añadimos una columna de porcentajes al dataframe
+df_cms_frecuencias$Porcentaje <- (df_cms_frecuencias$Freq / total_frecuencias) * 100
+
+# Diagrama de Barras de CMS
+p2 <- ggplot(df_cms_frecuencias, aes(x = Var1, y = Freq, fill = Var1)) +
+  geom_bar(stat = "identity") +
+  geom_text(aes(label = Freq), vjust = -0.3, size = 3.5) +  # Frecuencias arriba de cada barra
+  # Porcentajes en la mitad + o -
+  geom_text(aes(label = paste0(round(Porcentaje, 1), "%")), vjust = 5, size = 3.5) +  
+  scale_fill_manual(values = c("salmon", "seashell3", "turquoise3", "slategray")) +
+  labs(title = "CMS", x = "", y = "Frecuencia") +
+  theme_minimal() +
+  theme(legend.position = "none") # Omitir la leyenda
+
+p2
+```
+
+## ESTADIO
+
+```{r chunck_3_3}
+# Pasamos a DataFrame stage
+df_stage_frecuencias <- as.data.frame(stage_frecuencias)
+df_stage_frecuencias
+
+# Añadimos los porcentajes
+# Calculamos el total de frecuencias
+total_frecuencias <- sum(df_stage_frecuencias$Freq)
+# Añadimos una columna de porcentajes al dataframe
+df_stage_frecuencias$Porcentaje <- (df_stage_frecuencias$Freq / total_frecuencias) * 100
+
+# Diagrama de Barras de ESTADIO
+p3 <- ggplot(df_stage_frecuencias, aes(x = Var1, y = Freq)) +
+  geom_bar(stat = "identity", fill = c("salmon", "seashell3")) +
+  geom_text(aes(label = Freq), vjust = -0.5, size = 3.5) + # Frecuencias arriba de cada barra
+  # Porcentajes en la mitad + o -
+  geom_text(aes(label = paste0(round(Porcentaje, 1), "%")), vjust = 5, size = 3.5) +
+  labs(title = "STAGE", x = "", y = "Frecuencia") +
+  theme_minimal()
+p3
+```
+
+## ESTADIO vs MSI/MSS
+
+```{r chunck_3_4}
+# Stage vs MSI/MSS DataFrame
+stage_MSI_MSS_df
+
+# Añadimos los porcentajes
+# Calculamos el total de frecuencias
+total_frecuencias <- sum(stage_MSI_MSS_df$Freq)
+# Añadimos una columna de porcentajes al dataframe
+stage_MSI_MSS_df$Porcentaje <- (stage_MSI_MSS_df$Freq / total_frecuencias) * 100
+
+# Diagrama de Barras de Stage vs MSI/MSS
+p4 <- ggplot(stage_MSI_MSS_df, aes(x = Stage_MSI_MSS, y = Freq)) +
+  geom_bar(stat = "identity", fill = c("salmon", "seashell3",
+                                       "turquoise3", "slategray")) +
+  geom_text(aes(label = Freq), vjust = -0.5, size = 3.5) + # Frecuencias arriba de cada barra
+  # Porcentajes en la mitad + o -
+  geom_text(aes(label = paste0(round(Porcentaje, 1), "%")), vjust = 2, size = 3.5) +
+  labs(title = "STAGE vs MSI/MSS", x = "", y = "Frecuencia") +
+  theme_minimal()
+ 
+p4
+```
+
+## TODOS
+
+```{r chunck_3_5, fig.width=8, fig.height=8,}
+# Múltiple Layout con ggplot
+require(patchwork)
+# En un grid 2x2
+p1 + p2 + p3 + p4 + plot_layout(ncol = 2, nrow = 2)
+```
+
+# Análisis PCA {.tabset .tabset-fade .tabset-pills}
+
+Para el Análisis de Componentes Principales (PCA), normalizamos y escalamos 
+(estandarizamos) la matriz de expresión. En nuestro caso, los datos ya están 
+normalizamos (en principio con $log_2$) por lo que tan solo los escalamos.  
+La estandarización se realiza restando la media de cada variable y 
+dividiendo el resultado por la desviación estándar de esa variable.   
+
+$$  
+Z = \frac{x-\mu}{\sigma}
+$$ 
+Utilizamos la función `scale` para escalar. A continuación realizamos el PCA 
+con la transpuesta de la matriz de expresión dado que queremos un análisis de 
+las muestras en función de los genes y no al revés.   
+**IMP**: al hacer el escalado antes de la transposición estamos estandarizando
+por genes y no por muestras.  
+
+```{r chunck PCA_0, fig.width=8, fig.height=8,}
+# Escalamos/normalizamos la matriz de expresión. También centra. 28/04/2024
+# Al hacer el escalado antes de la transposición estamos escalando por genes y 
+# no por muestras.
+df_exmat_scaled <- scale(df_exmat)
+# Hacemos el PCA. Hay que hacer la transpuesta de la matriz de expresión 
+# (las columnas representan genes y las filas representen muestras), así los 
+# componentes principales reflejan la variabilidad entre muestras. 28/04/2024
+# Na haría falta center = TRUE ya que al escalar ya centralizamos.
+pca_result <- prcomp(t(df_exmat_scaled), center = TRUE, scale. = FALSE)
+```
+
+**RESUMEN PCA**
+
+```{r chunck PCA_0_1, fig.width=8, fig.height=8,}
+# Obtenemos los valores propios (la varianza explicada por cada componente)
+varianza <- pca_result$sdev^2
+
+# Calculamos la proporción de varianza explicada por cada componente
+prop_varianza <- varianza / sum(varianza)
+
+# Calculamos la proporción acumulativa de varianza explicada
+prop_acumulada <- cumsum(prop_varianza)
+
+# Crear un dataframe con esta información para las primeras 10 PC
+resumen_pca <- data.frame(
+  SD = pca_result$sdev[1:10],
+  Varianza = prop_varianza[1:10],
+  VarAcumulada = prop_acumulada[1:10]
+)
+
+print(resumen_pca)
+```
+
+La baja varianza explicada por los primeros dos componentes, PC1 (8,2%) y PC2 
+(5.4%), sugiere que los datos tienen una distribución de varianza muy dispersa y 
+que no hay unas pocas direcciones principales de variabilidad que dominen.  
+Esto es coherente con el hecho de que estamos tratando con datos biológicos, en 
+concreto de CRC, que suelen ser de alta dimensionalidad con múltiples factores 
+contribuyendo a la variabilidad general. Es decir, no hay patrones dominantes 
+de variabilidad que puedan ser fácilmente capturados por los primeros 
+componentes principales.
+  
+**CARGAS DE GENES EN PCA**  
+  
+Para entender mejor qué genes están contribuyendo a la separación observada, 
+podemos analizar las cargas de los componentes principales para ver qué genes 
+tienen mayores pesos en los componentes que diferencian los grupos.
+
+```{r chunck PCA_0_2, fig.width=9, fig.height=5,}
+# Extracción de cargas de componentes principales
+cargas_pca <- pca_result$rotation  
+
+# Mostramos las cargas de los primeros dos componentes
+primer_componente <- cargas_pca[, 1]  
+segundo_componente <- cargas_pca[, 2]  
+```
+  
+**PC1**  
+
+```{r chunck PCA_0_3, fig.width=9, fig.height=5,}
+# Extraemos los top 10 genes y sus cargas de PC1
+top_genes_pc1 <- head(sort(primer_componente, decreasing = TRUE), 10)
+
+# Convertimos a data frame para visualización de PC1
+top_genes_pc1_df <- data.frame(
+  Gen = names(top_genes_pc1),
+  Carga = top_genes_pc1
+)
+# Ordenamos el dataframe por carga de manera descendente
+top_genes_pc1_df <- top_genes_pc1_df[order(top_genes_pc1_df$Carga, 
+                                           decreasing = TRUE), ]
+# Ajustamos los factores para que el orden de los genes sea según las cargas
+top_genes_pc1_df$Gen <- factor(top_genes_pc1_df$Gen, levels = top_genes_pc1_df$Gen)
+
+# Creamos el gráfico de barras
+plot_pc1 <- ggplot(top_genes_pc1_df, aes(x = Gen, y = Carga, fill = Gen)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5)) +
+  labs(title = "Top 10 Cargas de Genes en PC1",
+       x = "Gen",
+       y = "Carga") +
+  scale_color_gradient(low = "peachpuff", high = "peachpuff4")
+
+# Mostramos los top 10 genes de PC1
+print(top_genes_pc1)
+```
+
+**PC2**  
+
+```{r chunck PCA_0_4, fig.width=9, fig.height=5,}
+# Extraemos los top 10 genes y sus cargas de PC2
+top_genes_pc2 <- head(sort(segundo_componente, decreasing = TRUE), 10)
+
+# Convertimos a data frame para visualización de PC2
+top_genes_pc2_df <- data.frame(
+  Gen = names(top_genes_pc2),
+  Carga = top_genes_pc2
+)
+# Ordenamos el dataframe por carga de manera descendente
+top_genes_pc2_df <- top_genes_pc2_df[order(top_genes_pc2_df$Carga, 
+                                           decreasing = TRUE), ]
+# Ajustamos los factores para que el orden de los genes sea según las cargas
+top_genes_pc2_df$Gen <- factor(top_genes_pc2_df$Gen, levels = top_genes_pc2_df$Gen)
+
+# Creamos el gráfico de barras
+plot_pc2 <- ggplot(top_genes_pc2_df, aes(x = Gen, y = Carga, fill = Gen)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5)) +
+  labs(title = "Top 10 Cargas de Genes en PC2",
+       x = "Gen",
+       y = "Carga") +
+  scale_color_gradient(low = "peachpuff", high = "peachpuff4")
+
+# Mostramos los top 10 genes de PC1
+print(top_genes_pc2)
+
+# Mostramos gráficamente las cargas del top 10 tanto de PC1 como de PC2
+library(patchwork)
+# En un grid 2x1
+plot_pc1 + plot_pc2 + plot_layout(ncol = 2, nrow = 1)
+```
+  
+**GRÁFICAS PCA** 
+  
+Utilizamos el paquete `factoextra` para realizar las gráficas de los 2 primeros 
+componentes, en concreto cla función `fviz_pca_ind`, que además nos permite 
+añadir las elipses de confianza.
+
+## Estudios de origen 
+
+Entre los diferentes grupos de estudio, las elipses de confianza están centradas
+y solapadas lo que sugiere que, en el espacio de los primeros dos componentes 
+principales, no hay una separación clara entre los grupos.
+  
+No es descartable la necesidad de examinar componentes adicionales o utilizar 
+otras técnicas de análisis como métodos de *Clustering*.
+
+```{r chunck PCA_1, fig.width=8, fig.height=8,}
+# Utilizamos "factoextra" para hacer la gráfica de la PCA
+library(factoextra)
+# Hacemos la gráfica de los dos primeros componentes
+fviz_pca_ind(pca_result,
+             col.ind = df_dataClin$study, # Colores de los puntos basados en los estudios
+             label = "none", 
+             addEllipses = TRUE, # Añadir elipses de confianza
+             ellipse.type = "confidence", # Tipo de elipse, puede ser 'confidence' o 't'
+             legend.title = "Study",
+             palette = "jco", # Paleta de colores, 'jco' es solo una opción
+             title = "PCA Estudios")
+```
+
+## MSI/MSS
+
+Cuando representamos la PCA por inestabilidad de microsatélites vemos que las 
+dos elipses, las de MSI y las de MSS, están claramente separadas lo que sugiere 
+que ambos grupos tienen perfiles de expresión genética distintos en las 
+dimensiones capturadas por los componentes principales (CP).  
+Como ya sabemos, estas diferencias son biológicamente relevantes; los componentes
+que muestran esta separación probablemente están capturando las  variaciones 
+genéticas ya conocidas de antemano. 
+  
+```{r chunck PCA_2, fig.width=8, fig.height=8,}
+# Hacemos la gráfica de los dos primeros componentes en relación a los grupos 
+fviz_pca_ind(pca_result,
+             col.ind = df_dataClin$msi_imputed, # Colores de los puntos basados en MSI/MSS
+             label = "none", 
+             addEllipses = TRUE, # Añadir elipses de confianza
+             ellipse.type = "confidence", # Tipo de elipse, puede ser 'confidence' o 't'
+             legend.title = "MSI/MSS",
+             palette = "jco", # Paleta de colores, 'jco' es solo una opción
+             title = "PCA MSI/MSS")
+```
+
+## ESTADIO II/III
+
+Entre los dos grupos de estadio, II y III, las elipses de confianza están más o 
+menos centradas y algo solapadas lo que sugiere que, no hay una separación clara
+entre los grupos. Algo un tanto previsible ya que el estadio del cáncer depende 
+del **tiempo** de progreso de la enfermedad.  
+
+```{r chunck PCA_3, fig.width=8, fig.height=8,}
+# Hacemos la gráfica de los dos primeros componentes en relación a los grupos 
+fviz_pca_ind(pca_result,
+             col.ind = df_dataClin$stage, # Colores de los puntos basados en Estadio
+             label = "none", 
+             addEllipses = TRUE, # Añadir elipses de confianza
+             ellipse.type = "confidence", # Tipo de elipse, puede ser 'confidence' o 't'
+             legend.title = "Estadio",
+             palette = "jco", # Paleta de colores, 'jco' es solo una opción
+             title = "PCA Estadio II/III")
+```
+
+## MSI/MSS vs ESTADIO II/III
+
+Se podría decir que esta gráfica és una combinación de las dos anteriores; 
+fijándonos en las elipses de confianza, se observan dos grupos separados 
+claramente de otros dos, debido principalmente a la contribución de la 
+instabilidad de microsatélites y no tanto a la del estadio del CRC.  
+
+```{r chunck PCA_4, fig.width=8, fig.height=8,}
+# Hacemos la gráfica de los dos primeros componentes en relación a los grupos 
+fviz_pca_ind(pca_result,
+             col.ind = df_dataClin$grupo, # Colores de los puntos basados en Grupos
+             label = "none", 
+             addEllipses = TRUE, # Añadir elipses de confianza
+             ellipse.type = "confidence", # Tipo de elipse, puede ser 'confidence' o 't'
+             legend.title = "Grupo",
+             palette = "jco", # Paleta de colores, 'jco' es solo una opción
+             title = "PCA Grupos")
+```
+
+## CMS
+
+Al igual que con la inestabilidad de microsatélites, cuando representamos la PCA
+por clasificación CMS vemos que las cuatro elipses están claramente separadas; 
+los 4 grupos tienen perfiles de expresión genética distintos en las dimensiones 
+capturadas por los CP.  
+Estas diferencias son biológicamente relevantes dado que los componentes
+que muestran esta separación están capturando variaciones genéticas ya 
+conocidas.
+
+```{r chunck PCA_5, fig.width=8, fig.height=8,}
+# Hacemos la gráfica de los dos primeros componentes en relación a los grupos 
+fviz_pca_ind(pca_result,
+             col.ind = df_dataClin$cms, # Colores de los puntos basados en CMS
+             label = "none", 
+             addEllipses = TRUE, # Añadir elipses de confianza
+             ellipse.type = "confidence", # Tipo de elipse, puede ser 'confidence' o 't'
+             legend.title = "CMS",
+             palette = "jco", # Paleta de colores, 'jco' es solo una opción
+             title = "PCA por CMS")
+```
+
+
+# Estimación de la infiltración celular 
+
+Analizamos los datos viendo la infiltración celular.  
+
+## MCPcounter {.tabset .tabset-fade .tabset-pills}
+
+Utilizamos el paquete *MCPcounter* [@becht2016estimating] que estima la 
+abundancia poblacional de poblaciones de células inmunes (8 tipos) y estromales 
+(2 tipos) que se infiltran en tejidos mediante la expresión genética.
+
+En concreto, utilizatemos *MCPcounter* para estimar lainfiltración celular del 
+estroma y el sistema inmunitario en el microambiente tumoral (TME).
+
+
+```{r chunck_4_1_1}
+# Cargamos la librería "MCPcounter"
+require(MCPcounter)
+
+# Con todos los datos de la matriz de expresión 26/03/2024
+exmat_MCP <- MCPcounter.estimate(expression = df_exmat, 
+                                    featuresType = "HUGO_symbols")
+# Transponemos
+exmat_MCP <- t_df(exmat_MCP)
+# Añadimos los datos clínicos a los datos de la matriz generada con MCPcounter 26/03/2024
+exmat_MCP_Clin <- cbind(df_dataClin, exmat_MCP)
+
+```
+
+### Infiltración MSI/MSS vs stage {.tabset .tabset-fade}
+
+#### MSI/MSS vs stage de todos los tipos celulares
+
+
+```{r chunck_4_1_2, fig.width=10, fig.height=5, echo=TRUE}
+# Generamos todos los boxplot 27/03/2024
+grupo <- exmat_MCP_Clin$grupo
+# NK
+bp1 <- boxplot_MCPcounter (exmat_MCP_Clin, grupo, exmat_MCP_Clin$`NK cells`, grupo, "NK cells")
+# T cells
+bp2 <- boxplot_MCPcounter (exmat_MCP_Clin, grupo, exmat_MCP_Clin$`T cells`, grupo, "T cells")
+# CD8 T cells
+bp3 <- boxplot_MCPcounter (exmat_MCP_Clin, grupo, exmat_MCP_Clin$`CD8 T cells`, grupo, "CD8 T cells")
+# Cytotoxic lymphocytes
+bp4 <- boxplot_MCPcounter (exmat_MCP_Clin, grupo, exmat_MCP_Clin$`Cytotoxic lymphocytes`, grupo, "Cytotoxic lymphocytes")
+# B lineage
+bp5 <- boxplot_MCPcounter (exmat_MCP_Clin, grupo, exmat_MCP_Clin$`B lineage`, grupo, "B lineage")
+# Monocytic lineage
+bp6 <- boxplot_MCPcounter (exmat_MCP_Clin, grupo, exmat_MCP_Clin$`Monocytic lineage`, grupo, "Monocytic lineage")
+# Myeloid dendritic cells
+bp7 <- boxplot_MCPcounter (exmat_MCP_Clin, grupo, exmat_MCP_Clin$`Myeloid dendritic cells`, grupo, "Myeloid dendritic cells")
+# Neutrophils
+bp8 <- boxplot_MCPcounter (exmat_MCP_Clin, grupo, exmat_MCP_Clin$Neutrophils, grupo, "Neutrophils")
+# Endothelial cells
+bp9 <- boxplot_MCPcounter (exmat_MCP_Clin, grupo, exmat_MCP_Clin$`Endothelial cells`, grupo, "Endothelial cells")
+# Fibroblasts
+bp10 <- boxplot_MCPcounter (exmat_MCP_Clin, grupo, exmat_MCP_Clin$Fibroblasts, grupo, "Fibroblasts")
+
+library(patchwork)
+# En un grid 3x2
+bp1 + bp2 + bp3 + plot_layout(ncol = 3, nrow = 1)
+bp4 + bp5 + bp6 + plot_layout(ncol = 3, nrow = 1)
+bp7 + bp8 + bp9 + plot_layout(ncol = 3, nrow = 1)
+bp10 + plot_layout(ncol = 3, nrow = 1)
+```
+
+#### Infiltración NKs
+
+```{r chunck_4_1_3, fig.width=9, fig.height=13, echo=TRUE}
+# Generamos todos los boxplot referentes a NKs 27/03/2024  
+# Diagrama de Barras de NKs MSI vs MSS
+bp11 <- boxplot_MCPcounter (exmat_MCP_Clin, exmat_MCP_Clin$msi_imputed, 
+                            exmat_MCP_Clin$`NK cells`, exmat_MCP_Clin$msi_imputed,
+                            "NK cells MSI vs MSS")
+# Diagrama de Barras de NKs II vs III
+bp12 <- boxplot_MCPcounter (exmat_MCP_Clin, exmat_MCP_Clin$stage, 
+                            exmat_MCP_Clin$`NK cells`, exmat_MCP_Clin$stage,
+                            "NK cells II vs III")
+
+require(patchwork)
+# En un grid 2x2
+p4 + bp1 + p1+ bp11 + p3 + bp12 + plot_layout(ncol = 2, nrow = 3)
+```
+
+### Infiltración resto de tipos celulares {.tabset .tabset-fade}
+
+#### T cells
+
+```{r chunck_4_2_1, fig.width=9, fig.height=5, echo=TRUE}
+# Generamos todos los boxplot referentes 01/04/2024  
+# Diagrama de Barras MSI vs MSS
+bp13 <- boxplot_MCPcounter (exmat_MCP_Clin, exmat_MCP_Clin$msi_imputed, 
+                            exmat_MCP_Clin$`T cells`, exmat_MCP_Clin$msi_imputed, "T cells MSI vs MSS")
+# Diagrama de Barras II vs III
+bp14 <- boxplot_MCPcounter (exmat_MCP_Clin, exmat_MCP_Clin$stage, 
+                            exmat_MCP_Clin$`T cells`, exmat_MCP_Clin$stage, "T cells II vs III")
+
+require(patchwork)
+# En un grid 1x3
+bp2 + bp13 + bp14 + plot_layout(ncol = 3, nrow = 1)
+```
+
+#### CD8 T cells
+
+```{r chunck_4_2_2, fig.width=9, fig.height=5, echo=TRUE}
+# Generamos todos los boxplot referentes 01/04/2024  
+# Diagrama de Barras MSI vs MSS
+bp15 <- boxplot_MCPcounter (exmat_MCP_Clin, exmat_MCP_Clin$msi_imputed, 
+                            exmat_MCP_Clin$`CD8 T cells`, exmat_MCP_Clin$msi_imputed, "CD8 T cells MSI vs MSS")
+# Diagrama de Barras II vs III
+bp16 <- boxplot_MCPcounter (exmat_MCP_Clin, exmat_MCP_Clin$stage, 
+                            exmat_MCP_Clin$`CD8 T cells`, exmat_MCP_Clin$stage, "CD8 T cells II vs III")
+
+require(patchwork)
+# En un grid 1x3
+bp3 + bp15 + bp16 + plot_layout(ncol = 3, nrow = 1)
+```
+
+#### Cytotoxic lymphocytes
+
+```{r chunck_4_2_3, fig.width=9, fig.height=5, echo=TRUE}
+# Generamos todos los boxplot referentes 01/04/2024  
+# Diagrama de Barras MSI vs MSS
+bp17 <- boxplot_MCPcounter (exmat_MCP_Clin, exmat_MCP_Clin$msi_imputed, 
+                            exmat_MCP_Clin$`Cytotoxic lymphocytes`, exmat_MCP_Clin$msi_imputed, "Cytotoxic lymphocytes MSI vs MSS")
+# Diagrama de Barras II vs III
+bp18 <- boxplot_MCPcounter (exmat_MCP_Clin, exmat_MCP_Clin$stage, 
+                            exmat_MCP_Clin$`Cytotoxic lymphocytes`, exmat_MCP_Clin$stage, "Cytotoxic lymphocytes II vs III")
+
+require(patchwork)
+# En un grid 1x3
+bp4 + bp17 + bp18 + plot_layout(ncol = 3, nrow = 1)
+```
+
+#### B lineage
+  
+```{r chunck_4_2_4, fig.width=9, fig.height=5, echo=TRUE}
+# Generamos todos los boxplot referentes 01/04/2024  
+# Diagrama de Barras MSI vs MSS
+bp19 <- boxplot_MCPcounter (exmat_MCP_Clin, exmat_MCP_Clin$msi_imputed, 
+                            exmat_MCP_Clin$`B lineage`, exmat_MCP_Clin$msi_imputed, "B lineage MSI vs MSS")
+# Diagrama de Barras II vs III
+bp20 <- boxplot_MCPcounter (exmat_MCP_Clin, exmat_MCP_Clin$stage, 
+                            exmat_MCP_Clin$`B lineage`, exmat_MCP_Clin$stage, "B lineage II vs III")
+
+require(patchwork)
+# En un grid 1x3
+bp5 + bp19 + bp20 + plot_layout(ncol = 3, nrow = 1)
+```
+
+#### Monocytic lineage
+
+```{r chunck_4_2_5, fig.width=9, fig.height=5, echo=TRUE}
+# Generamos todos los boxplot referentes 01/04/2024  
+# Diagrama de Barras MSI vs MSS
+bp21 <- boxplot_MCPcounter (exmat_MCP_Clin, exmat_MCP_Clin$msi_imputed, 
+                            exmat_MCP_Clin$`Monocytic lineage`, exmat_MCP_Clin$msi_imputed, "Monocytic lineage MSI vs MSS")
+# Diagrama de Barras II vs III
+bp22 <- boxplot_MCPcounter (exmat_MCP_Clin, exmat_MCP_Clin$stage, 
+                            exmat_MCP_Clin$`Monocytic lineage`, exmat_MCP_Clin$stage, "Monocytic lineage II vs III")
+
+require(patchwork)
+# En un grid 1x3
+bp6 + bp21 + bp22 + plot_layout(ncol = 3, nrow = 1)
+```
+
+#### Myeloid dendritic cells
+
+```{r chunck_4_2_6, fig.width=9, fig.height=5, echo=TRUE}
+# Generamos todos los boxplot referentes 01/04/2024  
+# Diagrama de Barras MSI vs MSS
+bp23 <- boxplot_MCPcounter (exmat_MCP_Clin, exmat_MCP_Clin$msi_imputed, 
+                            exmat_MCP_Clin$`Myeloid dendritic cells`, exmat_MCP_Clin$msi_imputed, "Myeloid dendritic cells MSI vs MSS")
+# Diagrama de Barras II vs III
+bp24 <- boxplot_MCPcounter (exmat_MCP_Clin, exmat_MCP_Clin$stage, 
+                            exmat_MCP_Clin$`Myeloid dendritic cells`, exmat_MCP_Clin$stage, "Myeloid dendritic cells II vs III")
+
+require(patchwork)
+# En un grid 1x3
+bp7 + bp23 + bp24 + plot_layout(ncol = 3, nrow = 1)
+```
+
+#### Neutrophils
+
+```{r chunck_4_2_7, fig.width=9, fig.height=5, echo=TRUE}
+# Generamos todos los boxplot referentes 01/04/2024  
+# Diagrama de Barras MSI vs MSS
+bp25 <- boxplot_MCPcounter (exmat_MCP_Clin, exmat_MCP_Clin$msi_imputed, 
+                            exmat_MCP_Clin$`Neutrophils`, exmat_MCP_Clin$msi_imputed, "Neutrophils MSI vs MSS")
+# Diagrama de Barras II vs III
+bp26 <- boxplot_MCPcounter (exmat_MCP_Clin, exmat_MCP_Clin$stage, 
+                            exmat_MCP_Clin$`Neutrophils`, exmat_MCP_Clin$stage, "Neutrophils II vs III")
+
+require(patchwork)
+# En un grid 1x3
+bp8 + bp25 + bp26 + plot_layout(ncol = 3, nrow = 1)
+```
+
+#### Endothelial cells
+
+```{r chunck_4_2_8, fig.width=9, fig.height=5, echo=TRUE}
+# Generamos todos los boxplot referentes 01/04/2024  
+# Diagrama de Barras MSI vs MSS
+bp27 <- boxplot_MCPcounter (exmat_MCP_Clin, exmat_MCP_Clin$msi_imputed, 
+                            exmat_MCP_Clin$`Endothelial cells`, exmat_MCP_Clin$msi_imputed, "Endothelial cells MSI vs MSS")
+# Diagrama de Barras II vs III
+bp28 <- boxplot_MCPcounter (exmat_MCP_Clin, exmat_MCP_Clin$stage, 
+                            exmat_MCP_Clin$`Endothelial cells`, exmat_MCP_Clin$stage, "Endothelial cells II vs III")
+
+require(patchwork)
+# En un grid 1x3
+bp9 + bp27 + bp28 + plot_layout(ncol = 3, nrow = 1)
+```
+
+#### Fibroblasts
+
+```{r chunck_4_2_9, fig.width=9, fig.height=5, echo=TRUE}
+# Generamos todos los boxplot referentes 01/04/2024  
+# Diagrama de Barras MSI vs MSS
+bp29 <- boxplot_MCPcounter (exmat_MCP_Clin, exmat_MCP_Clin$msi_imputed, 
+                            exmat_MCP_Clin$`Fibroblasts`, exmat_MCP_Clin$msi_imputed, "Fibroblasts MSI vs MSS")
+# Diagrama de Barras II vs III
+bp30 <- boxplot_MCPcounter (exmat_MCP_Clin, exmat_MCP_Clin$stage, 
+                            exmat_MCP_Clin$`Fibroblasts`, exmat_MCP_Clin$stage, "Fibroblasts II vs III")
+
+require(patchwork)
+# En un grid 1x3
+bp10 + bp29 + bp30 + plot_layout(ncol = 3, nrow = 1)
+```
+
+#### NK cells
+
+```{r chunck_4_2_10, fig.width=9, fig.height=5, echo=TRUE}
+# En un grid 1x3
+bp1 + bp11 + bp12 + plot_layout(ncol = 3, nrow = 1)
+```
+
+### Infiltración CMS
+
+La clasificación CMS divide los tumores de CRC en cuatro subtipos principales, 
+basados en características moleculares distintas, lo que refleja diferencias en 
+la biología del tumor, la interacción con el TME, el pronóstico y la respuesta a
+tratamientos específicos. [@roelands2017immunogenomic]
+
+| Subtipo | Características | Inmunidad | Prevalencia |
+|---------|-----------------|-----------|-------------|
+| CMS1 (Subtipo Inmuno) | Alta inmunogenicidad, frecuentemente asociada con MSI y una alta carga mutacional. | Tienen una infiltración activa de células inmunitarias efectoras, lo que puede hacerlos más susceptibles a terapias inmunogénicas. | Aproximadamente el 14% de los casos de CRC. |
+| CMS2 (Subtipo Canónico) | Tumores con alta expresión de genes relacionados con el ciclo celular y la señalización WNT/MYC, presentando una marcada proliferación celular. | Son generalmente poco inmunogénicos, con menor infiltración inmune comparado con CMS1 y CMS4. | Es el subtipo más común, abarcando alrededor del 37% de los casos de CRC. |
+| CMS3 (Subtipo Metabólico) | Presenta alteraciones metabólicas, incluyendo un metabolismo energético distintivo, con una menor carga mutacional en comparación con CMS1. | Similar a CMS2, muestra baja inmunogenicidad. | Constituye aproximadamente el 13% de los casos de CRC |
+| CMS4 (Subtipo Mesenquimal) | Se caracteriza por la activación de vías relacionadas con la angiogénesis, la activación de células estromales y la señalización TGF-β, lo que conduce a un entorno inmunosupresor. | Aunque presenta una significativa infiltración inmune, esta es predominantemente de naturaleza supresora, con una alta presencia de células estromales. | Aproximadamente el 23% de los casos de CRC caen en este subtipo. |
+
+Vemos la infiltración celular según CMS.
+
+
+```{r chunck_4_3_2, fig.width=10, fig.height=5, echo=TRUE}
+# Quitamos los NA's de la columna cms 
+exmat_MCP_Clin_CMS <- exmat_MCP_Clin[!is.na(exmat_MCP_Clin$cms), ]
+# Generamos todos los boxplot 02/04/2024
+cms <- exmat_MCP_Clin_CMS$cms
+# NK
+bp1 <- boxplot_MCPcounter (exmat_MCP_Clin_CMS, cms, exmat_MCP_Clin_CMS$`NK cells`, cms, "NK cells")
+# T cells
+bp2 <- boxplot_MCPcounter (exmat_MCP_Clin_CMS, cms, exmat_MCP_Clin_CMS$`T cells`, cms, "T cells")
+# CD8 T cells
+bp3 <- boxplot_MCPcounter (exmat_MCP_Clin_CMS, cms, exmat_MCP_Clin_CMS$`CD8 T cells`, cms, "CD8 T cells")
+# Cytotoxic lymphocytes
+bp4 <- boxplot_MCPcounter (exmat_MCP_Clin_CMS, cms, exmat_MCP_Clin_CMS$`Cytotoxic lymphocytes`, cms, "Cytotoxic lymphocytes")
+# B lineage
+bp5 <- boxplot_MCPcounter (exmat_MCP_Clin_CMS, cms, exmat_MCP_Clin_CMS$`B lineage`, cms, "B lineage")
+# Monocytic lineage
+bp6 <- boxplot_MCPcounter (exmat_MCP_Clin_CMS, cms, exmat_MCP_Clin_CMS$`Monocytic lineage`, cms, "Monocytic lineage")
+# Myeloid dendritic cells
+bp7 <- boxplot_MCPcounter (exmat_MCP_Clin_CMS, cms, exmat_MCP_Clin_CMS$`Myeloid dendritic cells`, cms, "Myeloid dendritic cells")
+# Neutrophils
+bp8 <- boxplot_MCPcounter (exmat_MCP_Clin_CMS, cms, exmat_MCP_Clin_CMS$Neutrophils, cms, "Neutrophils")
+# Endothelial cells
+bp9 <- boxplot_MCPcounter (exmat_MCP_Clin_CMS, cms, exmat_MCP_Clin_CMS$`Endothelial cells`, cms, "Endothelial cells")
+# Fibroblasts
+bp10 <- boxplot_MCPcounter (exmat_MCP_Clin_CMS, cms, exmat_MCP_Clin_CMS$Fibroblasts, cms, "Fibroblasts")
+
+require(patchwork)
+# En un grid 3x2
+p2 + bp1 + bp2  + plot_layout(ncol = 3, nrow = 1)
+bp3 + bp4 + bp5 + plot_layout(ncol = 3, nrow = 1)
+bp6 + bp7 + bp8 + plot_layout(ncol = 3, nrow = 1)
+bp9 +  bp10 + plot_layout(ncol = 3, nrow = 1)
+```
+  
+Los tumores CMS2 y CMS3 son poco inmunogénicos; CMS1 y CMS4 difieren en el tipo de infiltración inmune.   
+Los tumores CMS1 tienden a acumular una gran cantidad de mutaciones debido al estado de MSI y atraen células efectoras inmunes.  
+Los tumores CMS4 exhiben un TME inmunosupresor con infiltración estromal. [@lanuza2022adoptive]
+
+
+# Referencias  
+
