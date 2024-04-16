@@ -78,10 +78,10 @@ t_df <- function(df) {
 }
 
 # Función para dibujar todos los boxplots de los datos de MCPcounter
-boxplot_MCPcounter <- function(data, x, y, fill, title) {
+boxplot_MCPcounter <- function(data, x, y, fill, title, p_value=NULL) {
   # Cargar ggplot2 si aún no está cargado
   require(ggplot2)
-  
+
   # Crear el boxplot
   bp <- ggplot(data, aes_string(x = x, y = y, fill = fill)) +
     geom_boxplot() +
@@ -92,7 +92,12 @@ boxplot_MCPcounter <- function(data, x, y, fill, title) {
     stat_summary(fun = mean, geom = "text", aes(label = round(..y.., digits = 2))
                  , vjust = -0.5, color = "black") +
     theme(legend.position = "none", # Omitir la leyenda si `grupo` ya es claro por el color
-          axis.text.x = element_text(angle = 45, hjust = 1)) # Inclinar las etiquetas del eje x
+          axis.text.x = element_text(angle = 45, hjust = 1))# Inclinar las etiquetas del eje x
+    # Añadimos p_value si se proporciona
+    if (!is.null(p_value)) {
+      bp <- bp + annotate("text", x = Inf, y = Inf, label = sprintf("K-W p-value: %.3f", p_value), 
+                          vjust = 0.95, hjust = 2.03, size = 4, color = "turquoise3")
+  }
   
   # Devolvemos el boxplot
   return(bp)
@@ -613,7 +618,7 @@ Utilizamos el paquete *MCPcounter* [@becht2016estimating] que estima la
 abundancia poblacional de poblaciones de células inmunes (8 tipos) y estromales 
 (2 tipos) que se infiltran en tejidos mediante la expresión genética.
 
-En concreto, utilizatemos *MCPcounter* para estimar lainfiltración celular del 
+En concreto, utilizatemos *MCPcounter* para estimar la infiltración celular del 
 estroma y el sistema inmunitario en el microambiente tumoral (TME).
 
 
@@ -635,12 +640,22 @@ exmat_MCP_Clin <- cbind(df_dataClin, exmat_MCP)
 
 #### MSI/MSS vs stage de todos los tipos celulares
 
+```{r chunck_4_1_2_0, echo=TRUE}
+# Calculamos los test no paraméticos Kruskal-Wallis (asumimos que no tenemos normalidad) 16/04/2024
+# Preparar datos (asegurarte de que `grupo` y `exmat_MCP_Clin$'NK cells'` están correctamente definidos)
+data <- exmat_MCP_Clin
+
+# Realizar test de Kruskal-Wallis
+kruskal_result <- kruskal.test(exmat_MCP_Clin$`Endothelial cells` ~ grupo, data = data)
+print(kruskal_result)
+```
+
 
 ```{r chunck_4_1_2, fig.width=10, fig.height=5, echo=TRUE}
 # Generamos todos los boxplot 27/03/2024
 grupo <- exmat_MCP_Clin$grupo
 # NK
-bp1 <- boxplot_MCPcounter (exmat_MCP_Clin, grupo, exmat_MCP_Clin$`NK cells`, grupo, "NK cells")
+bp1 <- boxplot_MCPcounter (exmat_MCP_Clin, grupo, exmat_MCP_Clin$`NK cells`, grupo, "NK cells", 0.9)
 # T cells
 bp2 <- boxplot_MCPcounter (exmat_MCP_Clin, grupo, exmat_MCP_Clin$`T cells`, grupo, "T cells")
 # CD8 T cells
