@@ -95,9 +95,15 @@ boxplot_MCPcounter <- function(data, x, y, fill, title, p_value=NULL) {
           axis.text.x = element_text(angle = 45, hjust = 1))# Inclinar las etiquetas del eje x
     # Añadimos p_value si se proporciona
     if (!is.null(p_value)) {
-      bp <- bp + annotate("text", x = Inf, y = Inf, label = sprintf("K-W p-value: %.3f", p_value), 
-                          vjust = 0.95, hjust = 2.03, size = 4, color = "turquoise3")
-  }
+      bp <- bp + annotate("text", x = Inf, y = Inf, 
+                          label = if (p_value < 0.001) { # notación científica
+                                    sprintf("p-value: %.3e", p_value)
+                                } else { # tres decimales desechando ceros a la izquierda
+                                    sprintf("p-value: %s", 
+                                            formatC(p_value, format = "fg", 
+                                                    digits = 3, 
+                                                    drop0trailing = TRUE))}, 
+                          vjust = 0.95, hjust = 1, size = 4, color = "turquoise3")}
   
   # Devolvemos el boxplot
   return(bp)
@@ -640,40 +646,52 @@ exmat_MCP_Clin <- cbind(df_dataClin, exmat_MCP)
 
 #### MSI/MSS vs stage de todos los tipos celulares
 
-```{r chunck_4_1_2_0, echo=TRUE}
+```{r chunck_4_1_2_1, echo=TRUE}
 # Calculamos los test no paraméticos Kruskal-Wallis (asumimos que no tenemos normalidad) 16/04/2024
-# Preparar datos (asegurarte de que `grupo` y `exmat_MCP_Clin$'NK cells'` están correctamente definidos)
-data <- exmat_MCP_Clin
 
-# Realizar test de Kruskal-Wallis
-kruskal_result <- kruskal.test(exmat_MCP_Clin$`Endothelial cells` ~ grupo, data = data)
-print(kruskal_result)
+# tests de Kruskal-Wallis para NK
+kw_NK_result <- kruskal.test(exmat_MCP_Clin$`NK cells` ~ grupo, data = exmat_MCP_Clin)
+
+# Para el resto de tipos celulares utilizamos una lista con los nombres
+tipos_celulares <- c("NK cells", "T cells", "CD8 T cells", "Cytotoxic lymphocytes", 
+                     "B lineage", "Monocytic lineage", "Myeloid dendritic cells", 
+                     "Neutrophils", "Endothelial cells", "Fibroblasts")
+
+# Aplicamos el test de Kruskal-Wallis a cada tipo celular con "lapply"
+resultados_kw <- lapply(tipos_celulares, function(cell_type) {
+  kruskal.test(reformulate("grupo", response = cell_type), data = exmat_MCP_Clin)
+})
+
+# Añadimos los nombres de los tipos celulares 
+names(resultados_kw) <- tipos_celulares
+
+# Extraemos los valores de p de todos los tests realizados
+p_valores <- sapply(resultados_kw, function(x) x$p.value)
 ```
 
-
-```{r chunck_4_1_2, fig.width=10, fig.height=5, echo=TRUE}
+```{r chunck_4_1_2_2, fig.width=10, fig.height=5, echo=TRUE}
 # Generamos todos los boxplot 27/03/2024
 grupo <- exmat_MCP_Clin$grupo
 # NK
-bp1 <- boxplot_MCPcounter (exmat_MCP_Clin, grupo, exmat_MCP_Clin$`NK cells`, grupo, "NK cells", 0.9)
+bp1 <- boxplot_MCPcounter (exmat_MCP_Clin, grupo, exmat_MCP_Clin$`NK cells`, grupo, "NK cells", p_valores["NK cells"])
 # T cells
-bp2 <- boxplot_MCPcounter (exmat_MCP_Clin, grupo, exmat_MCP_Clin$`T cells`, grupo, "T cells")
+bp2 <- boxplot_MCPcounter (exmat_MCP_Clin, grupo, exmat_MCP_Clin$`T cells`, grupo, "T cells", p_valores["T cells"])
 # CD8 T cells
-bp3 <- boxplot_MCPcounter (exmat_MCP_Clin, grupo, exmat_MCP_Clin$`CD8 T cells`, grupo, "CD8 T cells")
+bp3 <- boxplot_MCPcounter (exmat_MCP_Clin, grupo, exmat_MCP_Clin$`CD8 T cells`, grupo, "CD8 T cells", p_valores["CD8 T cells"])
 # Cytotoxic lymphocytes
-bp4 <- boxplot_MCPcounter (exmat_MCP_Clin, grupo, exmat_MCP_Clin$`Cytotoxic lymphocytes`, grupo, "Cytotoxic lymphocytes")
+bp4 <- boxplot_MCPcounter (exmat_MCP_Clin, grupo, exmat_MCP_Clin$`Cytotoxic lymphocytes`, grupo, "Cytotoxic lymphocytes", p_valores["Cytotoxic lymphocytes"])
 # B lineage
-bp5 <- boxplot_MCPcounter (exmat_MCP_Clin, grupo, exmat_MCP_Clin$`B lineage`, grupo, "B lineage")
+bp5 <- boxplot_MCPcounter (exmat_MCP_Clin, grupo, exmat_MCP_Clin$`B lineage`, grupo, "B lineage", p_valores["B lineage"])
 # Monocytic lineage
-bp6 <- boxplot_MCPcounter (exmat_MCP_Clin, grupo, exmat_MCP_Clin$`Monocytic lineage`, grupo, "Monocytic lineage")
+bp6 <- boxplot_MCPcounter (exmat_MCP_Clin, grupo, exmat_MCP_Clin$`Monocytic lineage`, grupo, "Monocytic lineage", p_valores["Monocytic lineage"])
 # Myeloid dendritic cells
-bp7 <- boxplot_MCPcounter (exmat_MCP_Clin, grupo, exmat_MCP_Clin$`Myeloid dendritic cells`, grupo, "Myeloid dendritic cells")
+bp7 <- boxplot_MCPcounter (exmat_MCP_Clin, grupo, exmat_MCP_Clin$`Myeloid dendritic cells`, grupo, "Myeloid dendritic cells", p_valores["Myeloid dendritic cells"])
 # Neutrophils
-bp8 <- boxplot_MCPcounter (exmat_MCP_Clin, grupo, exmat_MCP_Clin$Neutrophils, grupo, "Neutrophils")
+bp8 <- boxplot_MCPcounter (exmat_MCP_Clin, grupo, exmat_MCP_Clin$Neutrophils, grupo, "Neutrophils", p_valores["Neutrophils"])
 # Endothelial cells
-bp9 <- boxplot_MCPcounter (exmat_MCP_Clin, grupo, exmat_MCP_Clin$`Endothelial cells`, grupo, "Endothelial cells")
+bp9 <- boxplot_MCPcounter (exmat_MCP_Clin, grupo, exmat_MCP_Clin$`Endothelial cells`, grupo, "Endothelial cells", p_valores["Endothelial cells"])
 # Fibroblasts
-bp10 <- boxplot_MCPcounter (exmat_MCP_Clin, grupo, exmat_MCP_Clin$Fibroblasts, grupo, "Fibroblasts")
+bp10 <- boxplot_MCPcounter (exmat_MCP_Clin, grupo, exmat_MCP_Clin$Fibroblasts, grupo, "Fibroblasts", p_valores["Fibroblasts"])
 
 library(patchwork)
 # En un grid 3x2
@@ -685,16 +703,53 @@ bp10 + plot_layout(ncol = 3, nrow = 1)
 
 #### Infiltración NKs
 
-```{r chunck_4_1_3, fig.width=9, fig.height=13, echo=TRUE}
+Para realizar una comparativa entre dos grupos en los que asumimos no normalidad
+, en nuestro caso MSI vs MSS y estadio II vs estadio III, utilizamos el test no 
+paramétrico de Mann-Whitney U también conocido como el test de Wilcoxon en el 
+que se asume que los datos no necesitan ser normalmente distribuidos aunque 
+deben poder ordenarse.  
+
+```{r chunck_4_1_3_1, echo=TRUE}
+# Para dos grupos utilizamos el test no paramético Mann-Whitney U (asumimos que no tenemos normalidad) 16/04/2024
+# library(stats)
+
+# Extraemos los datos de células NK para los grupos MSI y MSS
+grupo_msi <- exmat_MCP_Clin$`NK cells`[exmat_MCP_Clin$msi_imputed == "MSI"]
+grupo_mss <- exmat_MCP_Clin$`NK cells`[exmat_MCP_Clin$msi_imputed == "MSS"]
+
+# Realizamos el test de Mann-Whitney U
+mwU_NK_msi_test <- wilcox.test(grupo_msi, grupo_mss, alternative = "two.sided")
+
+# Extraemos los datos de células NK para los estadios II y III
+grupo_sII <- exmat_MCP_Clin$`NK cells`[exmat_MCP_Clin$stage == "II"]
+grupo_sIII <- exmat_MCP_Clin$`NK cells`[exmat_MCP_Clin$stage == "III"]
+
+# Realizamos el test de Mann-Whitney U
+mwU_NK_stage_test <- wilcox.test(grupo_sII, grupo_sIII, alternative = "two.sided")
+```
+
+La hipótesis nula $H_0$ para el test de Mann-Whitney U establece que no hay diferencia
+en las medianas (o, más generalmente, en las distribuciones) de los dos grupos: 
+$$
+H_0: \mu_{grupo1} = \mu_{grupo2}
+$$
+La hipótesis alternativa $H_1$ es que hay una diferencia entre las distribuciones de 
+los dos grupos. En nuestro caso la planteamos **Bilateral (Two-sided)**: 
+
+$$
+H_1: \mu_{grupo1} \neq \mu_{grupo2}
+$$
+
+```{r chunck_4_1_3_2, fig.width=9, fig.height=13, echo=TRUE}
 # Generamos todos los boxplot referentes a NKs 27/03/2024  
 # Diagrama de Barras de NKs MSI vs MSS
 bp11 <- boxplot_MCPcounter (exmat_MCP_Clin, exmat_MCP_Clin$msi_imputed, 
                             exmat_MCP_Clin$`NK cells`, exmat_MCP_Clin$msi_imputed,
-                            "NK cells MSI vs MSS")
+                            "NK cells MSI vs MSS", mwU_NK_msi_test$p.value)
 # Diagrama de Barras de NKs II vs III
 bp12 <- boxplot_MCPcounter (exmat_MCP_Clin, exmat_MCP_Clin$stage, 
                             exmat_MCP_Clin$`NK cells`, exmat_MCP_Clin$stage,
-                            "NK cells II vs III")
+                            "NK cells II vs III", mwU_NK_stage_test$p.value)
 
 require(patchwork)
 # En un grid 2x2
@@ -870,32 +925,46 @@ tratamientos específicos. [@roelands2017immunogenomic]
 
 Vemos la infiltración celular según CMS.
 
+```{r chunck_4_3_1, echo=TRUE}
+# Calculamos los test no paraméticos Kruskal-Wallis (asumimos que no tenemos normalidad) 16/04/2024
 
-```{r chunck_4_3_2, fig.width=10, fig.height=5, echo=TRUE}
+# Aplicamos el test de Kruskal-Wallis a cada tipo celular con "lapply"
+resultados_kw_cms <- lapply(tipos_celulares, function(cell_type) {
+  kruskal.test(reformulate("cms", response = cell_type), data = exmat_MCP_Clin)
+})
+
+# Añadimos los nombres de los tipos celulares 
+names(resultados_kw_cms) <- tipos_celulares
+
+# Extraemos los valores de p de todos los tests realizados
+p_valores_cms <- sapply(resultados_kw_cms, function(x) x$p.value)
+```
+
+```{r chunck_5_3_2, fig.width=10, fig.height=5, echo=TRUE}
 # Quitamos los NA's de la columna cms 
 exmat_MCP_Clin_CMS <- exmat_MCP_Clin[!is.na(exmat_MCP_Clin$cms), ]
 # Generamos todos los boxplot 02/04/2024
 cms <- exmat_MCP_Clin_CMS$cms
 # NK
-bp1 <- boxplot_MCPcounter (exmat_MCP_Clin_CMS, cms, exmat_MCP_Clin_CMS$`NK cells`, cms, "NK cells")
+bp1 <- boxplot_MCPcounter (exmat_MCP_Clin_CMS, cms, exmat_MCP_Clin_CMS$`NK cells`, cms, "NK cells", p_valores_cms["NK cells"])
 # T cells
-bp2 <- boxplot_MCPcounter (exmat_MCP_Clin_CMS, cms, exmat_MCP_Clin_CMS$`T cells`, cms, "T cells")
+bp2 <- boxplot_MCPcounter (exmat_MCP_Clin_CMS, cms, exmat_MCP_Clin_CMS$`T cells`, cms, "T cells", p_valores_cms["T cells"])
 # CD8 T cells
-bp3 <- boxplot_MCPcounter (exmat_MCP_Clin_CMS, cms, exmat_MCP_Clin_CMS$`CD8 T cells`, cms, "CD8 T cells")
+bp3 <- boxplot_MCPcounter (exmat_MCP_Clin_CMS, cms, exmat_MCP_Clin_CMS$`CD8 T cells`, cms, "CD8 T cells", p_valores_cms["CD8 T cells"])
 # Cytotoxic lymphocytes
-bp4 <- boxplot_MCPcounter (exmat_MCP_Clin_CMS, cms, exmat_MCP_Clin_CMS$`Cytotoxic lymphocytes`, cms, "Cytotoxic lymphocytes")
+bp4 <- boxplot_MCPcounter (exmat_MCP_Clin_CMS, cms, exmat_MCP_Clin_CMS$`Cytotoxic lymphocytes`, cms, "Cytotoxic lymphocytes", p_valores_cms["Cytotoxic lymphocytes"])
 # B lineage
-bp5 <- boxplot_MCPcounter (exmat_MCP_Clin_CMS, cms, exmat_MCP_Clin_CMS$`B lineage`, cms, "B lineage")
+bp5 <- boxplot_MCPcounter (exmat_MCP_Clin_CMS, cms, exmat_MCP_Clin_CMS$`B lineage`, cms, "B lineage", p_valores_cms["B lineage"])
 # Monocytic lineage
-bp6 <- boxplot_MCPcounter (exmat_MCP_Clin_CMS, cms, exmat_MCP_Clin_CMS$`Monocytic lineage`, cms, "Monocytic lineage")
+bp6 <- boxplot_MCPcounter (exmat_MCP_Clin_CMS, cms, exmat_MCP_Clin_CMS$`Monocytic lineage`, cms, "Monocytic lineage", p_valores_cms["Monocytic lineage"])
 # Myeloid dendritic cells
-bp7 <- boxplot_MCPcounter (exmat_MCP_Clin_CMS, cms, exmat_MCP_Clin_CMS$`Myeloid dendritic cells`, cms, "Myeloid dendritic cells")
+bp7 <- boxplot_MCPcounter (exmat_MCP_Clin_CMS, cms, exmat_MCP_Clin_CMS$`Myeloid dendritic cells`, cms, "Myeloid dendritic cells", p_valores_cms["Myeloid dendritic cells"])
 # Neutrophils
-bp8 <- boxplot_MCPcounter (exmat_MCP_Clin_CMS, cms, exmat_MCP_Clin_CMS$Neutrophils, cms, "Neutrophils")
+bp8 <- boxplot_MCPcounter (exmat_MCP_Clin_CMS, cms, exmat_MCP_Clin_CMS$Neutrophils, cms, "Neutrophils", p_valores_cms["Neutrophils"])
 # Endothelial cells
-bp9 <- boxplot_MCPcounter (exmat_MCP_Clin_CMS, cms, exmat_MCP_Clin_CMS$`Endothelial cells`, cms, "Endothelial cells")
+bp9 <- boxplot_MCPcounter (exmat_MCP_Clin_CMS, cms, exmat_MCP_Clin_CMS$`Endothelial cells`, cms, "Endothelial cells", p_valores_cms["Endothelial cells"])
 # Fibroblasts
-bp10 <- boxplot_MCPcounter (exmat_MCP_Clin_CMS, cms, exmat_MCP_Clin_CMS$Fibroblasts, cms, "Fibroblasts")
+bp10 <- boxplot_MCPcounter (exmat_MCP_Clin_CMS, cms, exmat_MCP_Clin_CMS$Fibroblasts, cms, "Fibroblasts", p_valores_cms["Fibroblasts"])
 
 require(patchwork)
 # En un grid 3x2
