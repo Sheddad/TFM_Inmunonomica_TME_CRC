@@ -53,6 +53,7 @@ Sys.setlocale("LC_TIME", "C")
 ``` {r paquetes, include=FALSE}
 # Instalamos paquetes, si no lo están, en caso de ser requeridos
 if(!(require(bibtex))) install.packages("bibtex")
+# if(!(require(car))) install.packages("car") # Levene
 if(!(require(dplyr))) install.packages("dplyr")
 if(!(require(factoextra))) install.packages("factoextra")
 if(!(require(ggplot2))) install.packages("ggplot2")
@@ -122,10 +123,10 @@ Cargamos los arhivos contenidos en "infoClin_all_dataset.RData" y
 dataClin <- load("data/infoClin_all_dataset.RData")
 
 # Cargamos el archivo CRC_stageII.RData 19/03/2024
-dataCRC <- load("data/CRC_stageII.RData")
+#dataCRC <- load("data/CRC_stageII.RData")
 
 # Cargamos el archivo exp_mat.RData 02/04/2024
-#dataCRC <- load("data/exp_mat.RData")
+dataCRC <- load("data/exp_mat.RData")
 ```
 
 **GSE Files**
@@ -186,7 +187,7 @@ df_dataClin <- bind_rows(
 ) %>% arrange(ID)
 
 # Cramos una nueva columna "grupo" a los "df_dataClin" con los datos de msi y stage
-df_dataClin$grupo <- with(df_dataClin, paste(msi_imputed, stage, sep = " s "))
+df_dataClin$grupo <- with(df_dataClin, paste(stage, msi_imputed, sep = "_"))
 
 # Convertimos a factores
 df_dataClin <- df_dataClin %>%
@@ -641,10 +642,38 @@ exmat_MCP <- t_df(exmat_MCP)
 exmat_MCP_Clin <- cbind(df_dataClin, exmat_MCP)
 
 ```
+  
+A modo de recordatorio didáctico de *Inferencia Estadística*: 
+
+* El **nivel de significación** $\alpha$ de un contraste es el error máximo de 
+tipo I que estamos dispuestos a asumir.
+
+|                   | $H_0$ es verdadera  | $H_0$ es falsa    |
+|-------------------|---------------------|-------------------|
+| Rechazar $H_0$    | Error Tipo I (α)    | Decisión Correcta |
+| No rechazar $H_0$ | Decisión Correcta   | Error Tipo II (β) |
+  
+
+* El **p-valor** es la probabilidad del resultado del estadístico de contraste 
+observado o de uno más alejado cuando la hipótesis nula es cierta.  
+
+* El p-valor asociado a una observación del estadístico de contraste
+es el menor nivel de significación que nos permite rechazar la hipótesis nula.  
+
+* Si el p-valor es inferior al nivel de significación $\alpha$, rechazaremos la 
+hipótesis nula, en caso contrario la aceptaremos.
+
+En nuestro caso utilizamos un nivel de significación $\alpha = 0.05$
 
 ### Infiltración MSI/MSS vs stage {.tabset .tabset-fade}
 
 #### MSI/MSS vs stage de todos los tipos celulares
+
+Para hacer una comparativa entre los 4 grupos, utilizaremos el test no 
+paramétrico de Kruskal-Wallis. Se suele utilizar para determinar si hay 
+diferencias significativas entre tres o más grupos independientes cuando los 
+datos no cumplen los supuestos necesarios para realizar un ANOVA: normalidad y 
+homocedasticidad (homogeneidad de varianzas).  
 
 ```{r chunck_4_1_2_1, echo=TRUE}
 # Calculamos los test no paraméticos Kruskal-Wallis (asumimos que no tenemos normalidad) 16/04/2024
@@ -668,6 +697,23 @@ names(resultados_kw) <- tipos_celulares
 # Extraemos los valores de p de todos los tests realizados
 p_valores <- sapply(resultados_kw, function(x) x$p.value)
 ```
+
+La hipótesis nula del test de Kruskal-Wallis $H_0$ establece que todas las poblaciones
+(grupos) tienen distribuciones idénticas, es decir, las medianas de todos los 
+grupos son iguales.  
+
+$$
+H_0: \forall i, j \, (i \neq j) \Rightarrow \mu_i = \mu_j 
+$$  
+
+La hipótesis alternativa $H_1$ establece que al menos uno de los grupos tiene 
+una distribución diferente en cuanto a la mediana, comparada con las otras 
+poblaciones sin especificar cuál de los grupos es diferente.  
+
+$$
+H_1: \exists i \neq j \mid \mu_i \neq \mu_j
+$$  
+  
 
 ```{r chunck_4_1_2_2, fig.width=10, fig.height=5, echo=TRUE}
 # Generamos todos los boxplot 27/03/2024
@@ -703,6 +749,38 @@ bp10 + plot_layout(ncol = 3, nrow = 1)
 
 #### Infiltración NKs
 
+**NORMALIDAD Y HOMOCEDASTICIDAD**
+
+Primero compromabos la normalidad de los grupos para las NK cells.
+
+```{r chunck_4_1_3_0, echo=FALSE}
+
+# Extraemos los datos de células NK para los distintos grupos MSI y MSS
+grupo_msi <- exmat_MCP_Clin$`NK cells`[exmat_MCP_Clin$msi_imputed == "MSI"]
+grupo_mss <- exmat_MCP_Clin$`NK cells`[exmat_MCP_Clin$msi_imputed == "MSS"]
+
+# Realizamos la prueba de Shapiro-Wilk para MSI y MSS
+shapiro_msi_NK <- shapiro.test(grupo_msi)
+shapiro_mss_NK <- shapiro.test(grupo_mss)
+
+# Extraemos los datos de células NK para los estadios II y III
+grupo_sII <- exmat_MCP_Clin$`NK cells`[exmat_MCP_Clin$stage == "II"]
+grupo_sIII <- exmat_MCP_Clin$`NK cells`[exmat_MCP_Clin$stage == "III"]
+
+# Realizamos la prueba de Shapiro-Wilk para estadios II y III
+shapiro_II_NK <- shapiro.test(grupo_sII)
+shapiro_III_NK <- shapiro.test(grupo_sIII)
+```
+
+Tabla tabla con los resultados de los **tests de Shapiro** para normalidad.  
+Si p-value < 0.05 rechazamos la hipótesis nula de igualdad de estadísticos.
+
+|Shapiro test | MSI  | MSS | II | III |
+|--------|------|-----|-----|-----|
+| p-valor | `r sprintf("%.3e", shapiro_msi_NK$p.value)` | `r sprintf("%.3e",shapiro_mss_NK$p.value)` | `r sprintf("%.3e", shapiro_II_NK$p.value)` | `r sprintf("%.3e",shapiro_III_NK$p.value)` |  
+  
+Dado que no hay normalidad no hace falta comprobar homocedasticidad.
+
 Para realizar una comparativa entre dos grupos en los que asumimos no normalidad
 , en nuestro caso MSI vs MSS y estadio II vs estadio III, utilizamos el test no 
 paramétrico de Mann-Whitney U también conocido como el test de Wilcoxon en el 
@@ -711,20 +789,11 @@ deben poder ordenarse.
 
 ```{r chunck_4_1_3_1, echo=TRUE}
 # Para dos grupos utilizamos el test no paramético Mann-Whitney U (asumimos que no tenemos normalidad) 16/04/2024
-# library(stats)
 
-# Extraemos los datos de células NK para los grupos MSI y MSS
-grupo_msi <- exmat_MCP_Clin$`NK cells`[exmat_MCP_Clin$msi_imputed == "MSI"]
-grupo_mss <- exmat_MCP_Clin$`NK cells`[exmat_MCP_Clin$msi_imputed == "MSS"]
-
-# Realizamos el test de Mann-Whitney U
+# Realizamos el test de Mann-Whitney U para los grupos MSI y MSS
 mwU_NK_msi_test <- wilcox.test(grupo_msi, grupo_mss, alternative = "two.sided")
 
-# Extraemos los datos de células NK para los estadios II y III
-grupo_sII <- exmat_MCP_Clin$`NK cells`[exmat_MCP_Clin$stage == "II"]
-grupo_sIII <- exmat_MCP_Clin$`NK cells`[exmat_MCP_Clin$stage == "III"]
-
-# Realizamos el test de Mann-Whitney U
+# Realizamos el test de Mann-Whitney U para los estadios II y III
 mwU_NK_stage_test <- wilcox.test(grupo_sII, grupo_sIII, alternative = "two.sided")
 ```
 
@@ -733,8 +802,9 @@ en las medianas (o, más generalmente, en las distribuciones) de los dos grupos:
 $$
 H_0: \mu_{grupo1} = \mu_{grupo2}
 $$
-La hipótesis alternativa $H_1$ es que hay una diferencia entre las distribuciones de 
-los dos grupos. En nuestro caso la planteamos **Bilateral (Two-sided)**: 
+La hipótesis alternativa $H_1$ establece que hay una diferencia entre las 
+distribuciones de los dos grupos. En nuestro caso la planteamos **Bilateral 
+(Two-sided)**: 
 
 $$
 H_1: \mu_{grupo1} \neq \mu_{grupo2}
