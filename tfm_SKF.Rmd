@@ -621,11 +621,11 @@ Analizamos los datos viendo la infiltración celular.
 
 ## MCPcounter {.tabset .tabset-fade .tabset-pills}
 
-Utilizamos el paquete *MCPcounter* [@becht2016estimating] que estima la 
+Utilizamos el paquete `MCPcounter` [@becht2016estimating] que estima la 
 abundancia poblacional de poblaciones de células inmunes (8 tipos) y estromales 
 (2 tipos) que se infiltran en tejidos mediante la expresión genética.
 
-En concreto, utilizatemos *MCPcounter* para estimar la infiltración celular del 
+En concreto, utilizatemos `MCPcounter` para estimar la infiltración celular del 
 estroma y el sistema inmunitario en el microambiente tumoral (TME).
 
 
@@ -670,7 +670,7 @@ En nuestro caso utilizamos un nivel de significación $\alpha = 0.05$
 #### MSI/MSS vs stage de todos los tipos celulares
 
 Para hacer una comparativa entre los 4 grupos, utilizaremos el test no 
-paramétrico de Kruskal-Wallis. Se suele utilizar para determinar si hay 
+paramétrico de **Kruskal-Wallis**. Se suele utilizar para determinar si hay 
 diferencias significativas entre tres o más grupos independientes cuando los 
 datos no cumplen los supuestos necesarios para realizar un ANOVA: normalidad y 
 homocedasticidad (homogeneidad de varianzas).  
@@ -772,7 +772,7 @@ shapiro_II_NK <- shapiro.test(grupo_sII)
 shapiro_III_NK <- shapiro.test(grupo_sIII)
 ```
 
-Tabla tabla con los resultados de los **tests de Shapiro** para normalidad.  
+Tabla con los resultados de los **tests de Shapiro** para normalidad.  
 Si p-value < 0.05 rechazamos la hipótesis nula de igualdad de estadísticos.
 
 |Shapiro test | MSI  | MSS | II | III |
@@ -783,9 +783,9 @@ Dado que no hay normalidad no hace falta comprobar homocedasticidad.
 
 Para realizar una comparativa entre dos grupos en los que asumimos no normalidad
 , en nuestro caso MSI vs MSS y estadio II vs estadio III, utilizamos el test no 
-paramétrico de Mann-Whitney U también conocido como el test de Wilcoxon en el 
-que se asume que los datos no necesitan ser normalmente distribuidos aunque 
-deben poder ordenarse.  
+paramétrico de **Mann-Whitney U** también conocido como el test de **Wilcoxon**
+en el que se asume que los datos no necesitan ser normalmente distribuidos 
+aunque deben poder ordenarse.  
 
 ```{r chunck_4_1_3_1, echo=TRUE}
 # Para dos grupos utilizamos el test no paramético Mann-Whitney U (asumimos que no tenemos normalidad) 16/04/2024
