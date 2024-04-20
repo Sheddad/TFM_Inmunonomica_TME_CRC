@@ -147,9 +147,7 @@ clínicos como los de la matriz de expresión.
 
 Creamos un DataFrame para asignar cada ID a su estudio clínico. A cada estudio 
 le asignamos un color para poder identificarlo fácilmente en los estudios gráficos.
-
-
-
+  
 ```{r chunck_1_2}
 # 11/04/2023
 # Utilizamos el paquete "dplyr"
@@ -189,13 +187,15 @@ df_dataClin <- bind_rows(
 # Cramos una nueva columna "grupo" a los "df_dataClin" con los datos de msi y stage
 df_dataClin$grupo <- with(df_dataClin, paste(stage, msi_imputed, sep = "_"))
 
+# Cramos una nueva columna "cms_stage" a los "df_dataClin" con los datos de cms y stage 19/04/2024
+df_dataClin$cms_stage <- with(df_dataClin, ifelse(is.na(cms), NA, paste(stage, cms, sep = "_")))
+
 # Convertimos a factores
 df_dataClin <- df_dataClin %>%
-  mutate(across(c(msi_imputed, cms, stage, grupo), factor))
+  mutate(across(c(msi_imputed, cms, stage, grupo, cms_stage), factor))
 
-# Añadimos las columnas "study" y "color" a df_dataClin
-df_dataClin <- left_join(df_dataClin, select(df_studies, ID, study, color), by = "ID")
-
+# Añadimos la columna "study" a df_dataClin. Al final no añadimos "color"
+df_dataClin <- left_join(df_dataClin, select(df_studies, ID, study), by = "ID")
 ``` 
 
 Pasamos la matriz de expresión a data_frame y la ordenamos por "ID"
@@ -207,7 +207,6 @@ df_exmat <- as.data.frame(ex)
 # Ordenamos la matriz de expresión por nombre de columnas 26/03/2024
 df_exmat <- df_exmat[, order(names(df_exmat))]
 ```
-  
   
 # Exploración de los datos
 
@@ -245,9 +244,53 @@ stage_MSI_MSS_df <- data.frame(
   Stage_MSI_MSS = c("II_MSI", "II_MSS", "III_MSI", "III_MSS"),
   Freq = c(sII_MSI, sII_MSS, sIII_MSI, sIII_MSS)
 )
+
+# Contamos cuantos MSI y MSS tenemos por cada estadio, II y III 19/04/2024
+sII_CMS1 <- sum(df_dataClin$cms_stage == "II_CMS1", na.rm = TRUE)
+sII_CMS2 <- sum(df_dataClin$cms_stage == "II_CMS2", na.rm = TRUE)
+sII_CMS3 <- sum(df_dataClin$cms_stage == "II_CMS3", na.rm = TRUE)
+sII_CMS4 <- sum(df_dataClin$cms_stage == "II_CMS4", na.rm = TRUE)
+sIII_CMS1 <- sum(df_dataClin$cms_stage == "III_CMS1", na.rm = TRUE)
+sIII_CMS2 <- sum(df_dataClin$cms_stage == "III_CMS2", na.rm = TRUE)
+sIII_CMS3 <- sum(df_dataClin$cms_stage == "III_CMS3", na.rm = TRUE)
+sIII_CMS4 <- sum(df_dataClin$cms_stage == "III_CMS4", na.rm = TRUE)
+
+# Crear un dataframe con estos valores
+stage_CMS_df <- data.frame(
+  Stage_CMS = c("II_CMS1", "II_CMS2", "II_CMS3", "II_CMS4", 
+                "III_CMS1", "III_CMS2", "III_CMS3", "III_CMS4"),
+  Freq = c(sII_CMS1, sII_CMS2, sII_CMS3, sII_CMS4, 
+           sIII_CMS1, sIII_CMS2, sIII_CMS3, sIII_CMS4)
+)
+
 ```
 
 # Análisis de los datos clínicos {.tabset .tabset-fade .tabset-pills}  
+
+## ESTADIO
+
+```{r chunck_3_3}
+# Pasamos a DataFrame stage
+df_stage_frecuencias <- as.data.frame(stage_frecuencias)
+df_stage_frecuencias
+
+# Añadimos los porcentajes
+# Calculamos el total de frecuencias
+total_frecuencias <- sum(df_stage_frecuencias$Freq)
+# Añadimos una columna de porcentajes al dataframe
+df_stage_frecuencias$Porcentaje <- (df_stage_frecuencias$Freq / total_frecuencias) * 100
+
+# Diagrama de Barras de ESTADIO
+p3 <- ggplot(df_stage_frecuencias, aes(x = Var1, y = Freq)) +
+  geom_bar(stat = "identity", fill = c("salmon", "seashell3")) +
+  geom_text(aes(label = Freq), vjust = -0.5, size = 3.5) + # Frecuencias arriba de cada barra
+  # Porcentajes en la mitad + o -
+  geom_text(aes(label = paste0(round(Porcentaje, 1), "%")), vjust = 5, size = 3.5) +
+  labs(title = "STAGE", x = "", y = "Frecuencia") +
+  theme_minimal()
+p3
+```
+
 
 ## MSI/MSS  
 
@@ -303,31 +346,7 @@ p2 <- ggplot(df_cms_frecuencias, aes(x = Var1, y = Freq, fill = Var1)) +
 p2
 ```
 
-## ESTADIO
-
-```{r chunck_3_3}
-# Pasamos a DataFrame stage
-df_stage_frecuencias <- as.data.frame(stage_frecuencias)
-df_stage_frecuencias
-
-# Añadimos los porcentajes
-# Calculamos el total de frecuencias
-total_frecuencias <- sum(df_stage_frecuencias$Freq)
-# Añadimos una columna de porcentajes al dataframe
-df_stage_frecuencias$Porcentaje <- (df_stage_frecuencias$Freq / total_frecuencias) * 100
-
-# Diagrama de Barras de ESTADIO
-p3 <- ggplot(df_stage_frecuencias, aes(x = Var1, y = Freq)) +
-  geom_bar(stat = "identity", fill = c("salmon", "seashell3")) +
-  geom_text(aes(label = Freq), vjust = -0.5, size = 3.5) + # Frecuencias arriba de cada barra
-  # Porcentajes en la mitad + o -
-  geom_text(aes(label = paste0(round(Porcentaje, 1), "%")), vjust = 5, size = 3.5) +
-  labs(title = "STAGE", x = "", y = "Frecuencia") +
-  theme_minimal()
-p3
-```
-
-## ESTADIO vs MSI/MSS
+## MSI/MSS vs ESTADIO
 
 ```{r chunck_3_4}
 # Stage vs MSI/MSS DataFrame
@@ -352,13 +371,42 @@ p4 <- ggplot(stage_MSI_MSS_df, aes(x = Stage_MSI_MSS, y = Freq)) +
 p4
 ```
 
+## CMS vs ESTADIO
+
+```{r chunck_3_5}
+# Stage vs MSI/MSS DataFrame
+stage_CMS_df
+
+# Añadimos los porcentajes
+# Calculamos el total de frecuencias
+total_frecuencias <- sum(stage_CMS_df$Freq)
+# Añadimos una columna de porcentajes al dataframe
+stage_CMS_df$Porcentaje <- (stage_CMS_df$Freq / total_frecuencias) * 100
+
+# Diagrama de Barras de Stage vs MSI/MSS
+p5 <- ggplot(stage_CMS_df, aes(x = Stage_CMS, y = Freq)) +
+  geom_bar(stat = "identity", fill = c("salmon", "seashell3",
+                                       "turquoise3", "slategray", 
+                                       "salmon", "seashell3",
+                                       "turquoise3", "slategray")) +
+  geom_text(aes(label = Freq), vjust = -0.5, size = 3.5) + # Frecuencias arriba de cada barra
+  # Porcentajes en la mitad + o -
+  geom_text(aes(label = paste0(round(Porcentaje, 1), "%")), vjust = 2, size = 3.5) +
+  labs(title = "STAGE vs CMS", x = "", y = "Frecuencia") +
+  theme_minimal() + 
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))# Inclinar las etiquetas del eje x
+ 
+p5
+```
+
 ## TODOS
 
-```{r chunck_3_5, fig.width=8, fig.height=8,}
+```{r chunck_3_6, fig.width=8, fig.height=8,}
 # Múltiple Layout con ggplot
 require(patchwork)
-# En un grid 2x2
-p1 + p2 + p3 + p4 + plot_layout(ncol = 2, nrow = 2)
+# En un grid 3x2
+p3 + p2 + p1
++ p4 + p5 + plot_layout(ncol = 3, nrow = 2)
 ```
 
 # Análisis PCA {.tabset .tabset-fade .tabset-pills}
@@ -615,11 +663,9 @@ fviz_pca_ind(pca_result,
 ```
 
 
-# Estimación de la infiltración celular 
+# Estimación de la infiltración celular {.tabset .tabset-fade .tabset-pills}
 
 Analizamos los datos viendo la infiltración celular.  
-
-## MCPcounter {.tabset .tabset-fade .tabset-pills}
 
 Utilizamos el paquete `MCPcounter` [@becht2016estimating] que estima la 
 abundancia poblacional de poblaciones de células inmunes (8 tipos) y estromales 
@@ -665,9 +711,9 @@ hipótesis nula, en caso contrario la aceptaremos.
 
 En nuestro caso utilizamos un nivel de significación $\alpha = 0.05$
 
-### Infiltración MSI/MSS vs stage {.tabset .tabset-fade}
+## Infiltración MSI/MSS vs stage {.tabset .tabset-fade}
 
-#### MSI/MSS vs stage de todos los tipos celulares
+### MSI/MSS vs stage de todos los tipos celulares
 
 Para hacer una comparativa entre los 4 grupos, utilizaremos el test no 
 paramétrico de **Kruskal-Wallis**. Se suele utilizar para determinar si hay 
@@ -747,7 +793,7 @@ bp7 + bp8 + bp9 + plot_layout(ncol = 3, nrow = 1)
 bp10 + plot_layout(ncol = 3, nrow = 1)
 ```
 
-#### Infiltración NKs
+### Infiltración NKs
 
 **NORMALIDAD Y HOMOCEDASTICIDAD**
 
@@ -826,9 +872,9 @@ require(patchwork)
 p4 + bp1 + p1+ bp11 + p3 + bp12 + plot_layout(ncol = 2, nrow = 3)
 ```
 
-### Infiltración resto de tipos celulares {.tabset .tabset-fade}
+## Infiltración resto de tipos celulares {.tabset .tabset-fade}
 
-#### T cells
+### T cells
 
 ```{r chunck_4_2_1, fig.width=9, fig.height=5, echo=TRUE}
 # Generamos todos los boxplot referentes 01/04/2024  
@@ -844,7 +890,7 @@ require(patchwork)
 bp2 + bp13 + bp14 + plot_layout(ncol = 3, nrow = 1)
 ```
 
-#### CD8 T cells
+### CD8 T cells
 
 ```{r chunck_4_2_2, fig.width=9, fig.height=5, echo=TRUE}
 # Generamos todos los boxplot referentes 01/04/2024  
@@ -860,7 +906,7 @@ require(patchwork)
 bp3 + bp15 + bp16 + plot_layout(ncol = 3, nrow = 1)
 ```
 
-#### Cytotoxic lymphocytes
+### Cytotoxic lymphocytes
 
 ```{r chunck_4_2_3, fig.width=9, fig.height=5, echo=TRUE}
 # Generamos todos los boxplot referentes 01/04/2024  
@@ -876,7 +922,7 @@ require(patchwork)
 bp4 + bp17 + bp18 + plot_layout(ncol = 3, nrow = 1)
 ```
 
-#### B lineage
+### B lineage
   
 ```{r chunck_4_2_4, fig.width=9, fig.height=5, echo=TRUE}
 # Generamos todos los boxplot referentes 01/04/2024  
@@ -892,7 +938,7 @@ require(patchwork)
 bp5 + bp19 + bp20 + plot_layout(ncol = 3, nrow = 1)
 ```
 
-#### Monocytic lineage
+### Monocytic lineage
 
 ```{r chunck_4_2_5, fig.width=9, fig.height=5, echo=TRUE}
 # Generamos todos los boxplot referentes 01/04/2024  
@@ -908,7 +954,7 @@ require(patchwork)
 bp6 + bp21 + bp22 + plot_layout(ncol = 3, nrow = 1)
 ```
 
-#### Myeloid dendritic cells
+### Myeloid dendritic cells
 
 ```{r chunck_4_2_6, fig.width=9, fig.height=5, echo=TRUE}
 # Generamos todos los boxplot referentes 01/04/2024  
@@ -924,7 +970,7 @@ require(patchwork)
 bp7 + bp23 + bp24 + plot_layout(ncol = 3, nrow = 1)
 ```
 
-#### Neutrophils
+### Neutrophils
 
 ```{r chunck_4_2_7, fig.width=9, fig.height=5, echo=TRUE}
 # Generamos todos los boxplot referentes 01/04/2024  
@@ -940,7 +986,7 @@ require(patchwork)
 bp8 + bp25 + bp26 + plot_layout(ncol = 3, nrow = 1)
 ```
 
-#### Endothelial cells
+### Endothelial cells
 
 ```{r chunck_4_2_8, fig.width=9, fig.height=5, echo=TRUE}
 # Generamos todos los boxplot referentes 01/04/2024  
@@ -956,7 +1002,7 @@ require(patchwork)
 bp9 + bp27 + bp28 + plot_layout(ncol = 3, nrow = 1)
 ```
 
-#### Fibroblasts
+### Fibroblasts
 
 ```{r chunck_4_2_9, fig.width=9, fig.height=5, echo=TRUE}
 # Generamos todos los boxplot referentes 01/04/2024  
@@ -972,14 +1018,16 @@ require(patchwork)
 bp10 + bp29 + bp30 + plot_layout(ncol = 3, nrow = 1)
 ```
 
-#### NK cells
+### NK cells
 
 ```{r chunck_4_2_10, fig.width=9, fig.height=5, echo=TRUE}
 # En un grid 1x3
 bp1 + bp11 + bp12 + plot_layout(ncol = 3, nrow = 1)
 ```
 
-### Infiltración CMS
+# Análisis CMS {.tabset .tabset-fade .tabset-pills}
+
+## Infiltración CMS
 
 La clasificación CMS divide los tumores de CRC en cuatro subtipos principales, 
 basados en características moleculares distintas, lo que refleja diferencias en 
