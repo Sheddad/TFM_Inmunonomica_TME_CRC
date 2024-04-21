@@ -269,7 +269,7 @@ stage_CMS_df <- data.frame(
 
 ## ESTADIO
 
-```{r chunck_3_3}
+```{r chunck_3_1}
 # Pasamos a DataFrame stage
 df_stage_frecuencias <- as.data.frame(stage_frecuencias)
 df_stage_frecuencias
@@ -281,20 +281,19 @@ total_frecuencias <- sum(df_stage_frecuencias$Freq)
 df_stage_frecuencias$Porcentaje <- (df_stage_frecuencias$Freq / total_frecuencias) * 100
 
 # Diagrama de Barras de ESTADIO
-p3 <- ggplot(df_stage_frecuencias, aes(x = Var1, y = Freq)) +
+p1 <- ggplot(df_stage_frecuencias, aes(x = Var1, y = Freq)) +
   geom_bar(stat = "identity", fill = c("salmon", "seashell3")) +
   geom_text(aes(label = Freq), vjust = -0.5, size = 3.5) + # Frecuencias arriba de cada barra
   # Porcentajes en la mitad + o -
   geom_text(aes(label = paste0(round(Porcentaje, 1), "%")), vjust = 5, size = 3.5) +
   labs(title = "STAGE", x = "", y = "Frecuencia") +
   theme_minimal()
-p3
+p1
 ```
-
 
 ## MSI/MSS  
 
-```{r chunck_3_1}
+```{r chunck_3_2}
 # Cargamos la librería "ggplot"
 require(ggplot2)
 
@@ -309,19 +308,44 @@ total_frecuencias <- sum(df_msi_frecuencias$Freq)
 df_msi_frecuencias$Porcentaje <- (df_msi_frecuencias$Freq / total_frecuencias) * 100
 
 # Diagrama de Barras de MSI/MSS
-p1 <- ggplot(df_msi_frecuencias, aes(x = Var1, y = Freq)) +
+p2 <- ggplot(df_msi_frecuencias, aes(x = Var1, y = Freq)) +
   geom_bar(stat = "identity", fill = c("salmon", "seashell3")) +
   geom_text(aes(label = Freq), vjust = -0.5, size = 3.5) + # Frecuencias arriba de cada barra
   # Porcentajes en la mitad + o -
   geom_text(aes(label = paste0(round(Porcentaje, 1), "%")), vjust = 5, size = 3.5) +
   labs(title = "MSI/MSS", x = "", y = "Frecuencia") +
   theme_minimal()
-p1
+p2
 ```
 
+## MSI/MSS & ESTADIO
+
+```{r chunck_3_3}
+# Stage vs MSI/MSS DataFrame
+stage_MSI_MSS_df
+
+# Añadimos los porcentajes
+# Calculamos el total de frecuencias
+total_frecuencias <- sum(stage_MSI_MSS_df$Freq)
+# Añadimos una columna de porcentajes al dataframe
+stage_MSI_MSS_df$Porcentaje <- (stage_MSI_MSS_df$Freq / total_frecuencias) * 100
+
+# Diagrama de Barras de Stage vs MSI/MSS
+p3 <- ggplot(stage_MSI_MSS_df, aes(x = Stage_MSI_MSS, y = Freq)) +
+  geom_bar(stat = "identity", fill = c("salmon", "seashell3",
+                                       "turquoise3", "slategray")) +
+  geom_text(aes(label = Freq), vjust = -0.5, size = 3.5) + # Frecuencias arriba de cada barra
+  # Porcentajes en la mitad + o -
+  geom_text(aes(label = paste0(round(Porcentaje, 1), "%")), vjust = 2, size = 3.5) +
+  labs(title = "STAGE & MSI/MSS", x = "", y = "Frecuencia") +
+  theme_minimal()
+ 
+p3
+```
+  
 ## CMS  
 
-```{r chunck_3_2}
+```{r chunck_3_4}
 # Pasamos a DataFrame cms
 df_cms_frecuencias <- as.data.frame(cms_frecuencias)
 df_cms_frecuencias
@@ -333,7 +357,7 @@ total_frecuencias <- sum(df_cms_frecuencias$Freq)
 df_cms_frecuencias$Porcentaje <- (df_cms_frecuencias$Freq / total_frecuencias) * 100
 
 # Diagrama de Barras de CMS
-p2 <- ggplot(df_cms_frecuencias, aes(x = Var1, y = Freq, fill = Var1)) +
+p4 <- ggplot(df_cms_frecuencias, aes(x = Var1, y = Freq, fill = Var1)) +
   geom_bar(stat = "identity") +
   geom_text(aes(label = Freq), vjust = -0.3, size = 3.5) +  # Frecuencias arriba de cada barra
   # Porcentajes en la mitad + o -
@@ -343,35 +367,10 @@ p2 <- ggplot(df_cms_frecuencias, aes(x = Var1, y = Freq, fill = Var1)) +
   theme_minimal() +
   theme(legend.position = "none") # Omitir la leyenda
 
-p2
-```
-
-## MSI/MSS vs ESTADIO
-
-```{r chunck_3_4}
-# Stage vs MSI/MSS DataFrame
-stage_MSI_MSS_df
-
-# Añadimos los porcentajes
-# Calculamos el total de frecuencias
-total_frecuencias <- sum(stage_MSI_MSS_df$Freq)
-# Añadimos una columna de porcentajes al dataframe
-stage_MSI_MSS_df$Porcentaje <- (stage_MSI_MSS_df$Freq / total_frecuencias) * 100
-
-# Diagrama de Barras de Stage vs MSI/MSS
-p4 <- ggplot(stage_MSI_MSS_df, aes(x = Stage_MSI_MSS, y = Freq)) +
-  geom_bar(stat = "identity", fill = c("salmon", "seashell3",
-                                       "turquoise3", "slategray")) +
-  geom_text(aes(label = Freq), vjust = -0.5, size = 3.5) + # Frecuencias arriba de cada barra
-  # Porcentajes en la mitad + o -
-  geom_text(aes(label = paste0(round(Porcentaje, 1), "%")), vjust = 2, size = 3.5) +
-  labs(title = "STAGE vs MSI/MSS", x = "", y = "Frecuencia") +
-  theme_minimal()
- 
 p4
 ```
 
-## CMS vs ESTADIO
+## CMS & ESTADIO
 
 ```{r chunck_3_5}
 # Stage vs MSI/MSS DataFrame
@@ -392,7 +391,7 @@ p5 <- ggplot(stage_CMS_df, aes(x = Stage_CMS, y = Freq)) +
   geom_text(aes(label = Freq), vjust = -0.5, size = 3.5) + # Frecuencias arriba de cada barra
   # Porcentajes en la mitad + o -
   geom_text(aes(label = paste0(round(Porcentaje, 1), "%")), vjust = 2, size = 3.5) +
-  labs(title = "STAGE vs CMS", x = "", y = "Frecuencia") +
+  labs(title = "STAGE & CMS", x = "", y = "Frecuencia") +
   theme_minimal() + 
   theme(axis.text.x = element_text(angle = 45, hjust = 1))# Inclinar las etiquetas del eje x
  
@@ -401,12 +400,11 @@ p5
 
 ## TODOS
 
-```{r chunck_3_6, fig.width=8, fig.height=8,}
+```{r chunck_3_6, fig.width=9, fig.height=13}
 # Múltiple Layout con ggplot
 require(patchwork)
 # En un grid 3x2
-p3 + p2 + p1
-+ p4 + p5 + plot_layout(ncol = 3, nrow = 2)
+p2 + p3 + p4 + p5 + p1 + plot_layout(ncol = 2, nrow = 3)
 ```
 
 # Análisis PCA {.tabset .tabset-fade .tabset-pills}
@@ -687,6 +685,9 @@ exmat_MCP <- t_df(exmat_MCP)
 # Añadimos los datos clínicos a los datos de la matriz generada con MCPcounter 26/03/2024
 exmat_MCP_Clin <- cbind(df_dataClin, exmat_MCP)
 
+# Guardamos "df_dataClin", "df_exmat" y "exmat_MCP_Clin" en un archivo .Rdata.
+# Lo hago para poder utilizar estos datos ya calculados en otros .rmd 21/04/2024
+#save(df_dataClin, df_exmat, exmat_MCP_Clin, file = "tfm_SKF_.RData")
 ```
   
 A modo de recordatorio didáctico de *Inferencia Estadística*: 
