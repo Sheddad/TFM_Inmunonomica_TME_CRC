@@ -1039,9 +1039,9 @@ bp10 + bp29 + bp30 + plot_layout(ncol = 3, nrow = 1)
 bp1 + bp11 + bp12 + plot_layout(ncol = 3, nrow = 1)
 ```
 
+
 # Análisis CMS {.tabset .tabset-fade .tabset-pills}
   
-
 La clasificación CMS divide los tumores de CRC en cuatro subtipos principales, 
 basados en características moleculares distintas, lo que refleja diferencias en 
 la biología del tumor, la interacción con el TME, el pronóstico y la respuesta a
@@ -1166,6 +1166,31 @@ bp9 +  bp10 + plot_layout(ncol = 2, nrow = 1)
 p5 + plot_layout(ncol = 2, nrow = 1)
 ```
 
+# Análisis HLA's
+
+Hacemos un data frame con los datos de expresión de los genes del Complejo Mayor
+de Hitocompatibilidad I HLA-A, HLA-B, HLA-C y el gen marcador de las células NK
+NKp46 (NCR1 en nomenclatura SYMBOL). Además añadimos la columna HLA-ABC con la 
+suma de expresión de los 3 genes.  
+  
+```{r chunck_HLA_1, echo=TRUE}
+# Creamos un df con los datos clínicos y los de expresión génica (transpuesta)
+# Transponemos la matriz de expresión: 22/04/2025
+df_exmat_t <- t(df_exmat)
+# Juntamos "df_dataClin" y "df_exmat_t"
+df_data_clin_exmat <- cbind(df_dataClin, df_exmat_t)
+
+# Nos quedamos solo con los genes del complejo mayor de hitocompatibilidad I 
+# HLA-ABC y con el marcador de células NK, el gen NKp46 (NCR1 en nomenclatura SYMBOL) 
+hla_nk_genes <- c("HLA-A", "HLA-B", "HLA-C", "NCR1")
+df_hla_nk_expression <- df_data_clin_exmat[hla_nk_genes]
+# Añadimos la columna HLA-ABC con la suma de expresión de los 3 genes
+df_hla_nk_expression$`HLA-ABC` <- df_hla_nk_expression$`HLA-A` + 
+  df_hla_nk_expression$`HLA-B` + df_hla_nk_expression$`HLA-C`
+
+# Añadimos los datos clínicos
+df_hla_nk_expression <- cbind(df_dataClin, df_hla_nk_expression)
+```
 
 
 # Referencias  
