@@ -660,6 +660,19 @@ fviz_pca_ind(pca_result,
              title = "PCA por CMS")
 ```
 
+## CMS-ESTADIO
+
+```{r chunck PCA_6, fig.width=8, fig.height=8,}
+# Hacemos la gráfica de los dos primeros componentes en relación a los grupos 
+fviz_pca_ind(pca_result,
+             col.ind = df_dataClin$cms_stage, # Colores de los puntos basados en CMS
+             label = "none", 
+             addEllipses = TRUE, # Añadir elipses de confianza
+             ellipse.type = "confidence", # Tipo de elipse, puede ser 'confidence' o 't'
+             legend.title = "cms_stage",
+             palette = "jco", # Paleta de colores, 'jco' es solo una opción
+             title = "PCA por CMS-Estadio")
+```
 
 # Estimación de la infiltración celular {.tabset .tabset-fade .tabset-pills}
 
@@ -1150,6 +1163,7 @@ bp3 + bp4 + plot_layout(ncol = 2, nrow = 1)
 bp5 + bp6 + plot_layout(ncol = 2, nrow = 1)
 bp7 +  bp8 + plot_layout(ncol = 2, nrow = 1)
 bp9 +  bp10 + plot_layout(ncol = 2, nrow = 1)
+p5 + plot_layout(ncol = 2, nrow = 1)
 ```
 
 
