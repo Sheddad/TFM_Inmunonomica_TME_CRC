@@ -687,7 +687,7 @@ exmat_MCP_Clin <- cbind(df_dataClin, exmat_MCP)
 
 # Guardamos "df_dataClin", "df_exmat" y "exmat_MCP_Clin" en un archivo .Rdata.
 # Lo hago para poder utilizar estos datos ya calculados en otros .rmd 21/04/2024
-#save(df_dataClin, df_exmat, exmat_MCP_Clin, file = "tfm_SKF_.RData")
+#save(df_dataClin, df_exmat, exmat_MCP_Clin, file = "tfm_SKF.RData")
 ```
   
 A modo de recordatorio didáctico de *Inferencia Estadística*: 
@@ -1027,8 +1027,7 @@ bp1 + bp11 + bp12 + plot_layout(ncol = 3, nrow = 1)
 ```
 
 # Análisis CMS {.tabset .tabset-fade .tabset-pills}
-
-## Infiltración CMS
+  
 
 La clasificación CMS divide los tumores de CRC en cuatro subtipos principales, 
 basados en características moleculares distintas, lo que refleja diferencias en 
@@ -1040,11 +1039,13 @@ tratamientos específicos. [@roelands2017immunogenomic]
 | CMS1 (Subtipo Inmuno) | Alta inmunogenicidad, frecuentemente asociada con MSI y una alta carga mutacional. | Tienen una infiltración activa de células inmunitarias efectoras, lo que puede hacerlos más susceptibles a terapias inmunogénicas. | Aproximadamente el 14% de los casos de CRC. |
 | CMS2 (Subtipo Canónico) | Tumores con alta expresión de genes relacionados con el ciclo celular y la señalización WNT/MYC, presentando una marcada proliferación celular. | Son generalmente poco inmunogénicos, con menor infiltración inmune comparado con CMS1 y CMS4. | Es el subtipo más común, abarcando alrededor del 37% de los casos de CRC. |
 | CMS3 (Subtipo Metabólico) | Presenta alteraciones metabólicas, incluyendo un metabolismo energético distintivo, con una menor carga mutacional en comparación con CMS1. | Similar a CMS2, muestra baja inmunogenicidad. | Constituye aproximadamente el 13% de los casos de CRC |
-| CMS4 (Subtipo Mesenquimal) | Se caracteriza por la activación de vías relacionadas con la angiogénesis, la activación de células estromales y la señalización TGF-β, lo que conduce a un entorno inmunosupresor. | Aunque presenta una significativa infiltración inmune, esta es predominantemente de naturaleza supresora, con una alta presencia de células estromales. | Aproximadamente el 23% de los casos de CRC caen en este subtipo. |
+| CMS4 (Subtipo Mesenquimal) | Se caracteriza por la activación de vías relacionadas con la angiogénesis, la activación de células estromales y la señalización TGF-β, lo que conduce a un entorno inmunosupresor. | Aunque presenta una significativa infiltración inmune, esta es predominantemente de naturaleza supresora, con una alta presencia de células estromales. | Aproximadamente el 23% de los casos de CRC caen en este subtipo.
 
-Vemos la infiltración celular según CMS.
+## Infiltración CMS
+ |
+Vemos la infiltración celular según CMS e inestabilidad de microsatélites.
 
-```{r chunck_4_3_1, echo=TRUE}
+```{r chunck_6_1, echo=TRUE}
 # Calculamos los test no paraméticos Kruskal-Wallis (asumimos que no tenemos normalidad) 16/04/2024
 
 # Aplicamos el test de Kruskal-Wallis a cada tipo celular con "lapply"
@@ -1059,7 +1060,7 @@ names(resultados_kw_cms) <- tipos_celulares
 p_valores_cms <- sapply(resultados_kw_cms, function(x) x$p.value)
 ```
 
-```{r chunck_5_3_2, fig.width=10, fig.height=5, echo=TRUE}
+```{r chunck_6_2, fig.width=10, fig.height=5, echo=TRUE}
 # Quitamos los NA's de la columna cms 
 exmat_MCP_Clin_CMS <- exmat_MCP_Clin[!is.na(exmat_MCP_Clin$cms), ]
 # Generamos todos los boxplot 02/04/2024
@@ -1096,6 +1097,61 @@ bp9 +  bp10 + plot_layout(ncol = 3, nrow = 1)
 Los tumores CMS2 y CMS3 son poco inmunogénicos; CMS1 y CMS4 difieren en el tipo de infiltración inmune.   
 Los tumores CMS1 tienden a acumular una gran cantidad de mutaciones debido al estado de MSI y atraen células efectoras inmunes.  
 Los tumores CMS4 exhiben un TME inmunosupresor con infiltración estromal. [@lanuza2022adoptive]
+
+## Infiltración CMS-ESTADIO
+ |
+Vemos la infiltración celular según CMS y estadio.
+
+```{r chunck_6_3, echo=TRUE}
+# Calculamos los test no paraméticos Kruskal-Wallis (asumimos que no tenemos normalidad) 22/04/2024
+
+# Aplicamos el test de Kruskal-Wallis a cada tipo celular con "lapply"
+resultados_kw_cms_stage <- lapply(tipos_celulares, function(cell_type) {
+  kruskal.test(reformulate("cms_stage", response = cell_type), data = exmat_MCP_Clin)
+})
+
+# Añadimos los nombres de los tipos celulares 
+names(resultados_kw_cms_stage) <- tipos_celulares
+
+# Extraemos los valores de p de todos los tests realizados
+p_valores_cms_stage <- sapply(resultados_kw_cms_stage, function(x) x$p.value)
+```
+
+```{r chunck_6_4, fig.width=10, fig.height=5, echo=TRUE}
+# Quitamos los NA's de la columna cms 
+exmat_MCP_Clin_CMS_stage <- exmat_MCP_Clin[!is.na(exmat_MCP_Clin$cms_stage), ]
+# Generamos todos los boxplot 02/04/2024
+cms_stage <- exmat_MCP_Clin_CMS$cms_stage
+# NK
+bp1 <- boxplot_MCPcounter (exmat_MCP_Clin_CMS_stage, cms_stage, exmat_MCP_Clin_CMS_stage$`NK cells`, cms_stage, "NK cells", p_valores_cms_stage["NK cells"])
+# T cells
+bp2 <- boxplot_MCPcounter (exmat_MCP_Clin_CMS_stage, cms_stage, exmat_MCP_Clin_CMS_stage$`T cells`, cms_stage, "T cells", p_valores_cms_stage["T cells"])
+# CD8 T cells
+bp3 <- boxplot_MCPcounter (exmat_MCP_Clin_CMS, cms_stage, exmat_MCP_Clin_CMS$`CD8 T cells`, cms_stage, "CD8 T cells", p_valores_cms_stage["CD8 T cells"])
+# Cytotoxic lymphocytes
+bp4 <- boxplot_MCPcounter (exmat_MCP_Clin_CMS_stage, cms_stage, exmat_MCP_Clin_CMS_stage$`Cytotoxic lymphocytes`, cms_stage, "Cytotoxic lymphocytes", p_valores_cms_stage["Cytotoxic lymphocytes"])
+# B lineage
+bp5 <- boxplot_MCPcounter (exmat_MCP_Clin_CMS_stage, cms_stage, exmat_MCP_Clin_CMS_stage$`B lineage`, cms_stage, "B lineage", p_valores_cms_stage["B lineage"])
+# Monocytic lineage
+bp6 <- boxplot_MCPcounter (exmat_MCP_Clin_CMS_stage, cms_stage, exmat_MCP_Clin_CMS_stage$`Monocytic lineage`, cms_stage, "Monocytic lineage", p_valores_cms_stage["Monocytic lineage"])
+# Myeloid dendritic cells
+bp7 <- boxplot_MCPcounter (exmat_MCP_Clin_CMS_stage, cms_stage, exmat_MCP_Clin_CMS_stage$`Myeloid dendritic cells`, cms_stage, "Myeloid dendritic cells", p_valores_cms_stage["Myeloid dendritic cells"])
+# Neutrophils
+bp8 <- boxplot_MCPcounter (exmat_MCP_Clin_CMS_stage, cms_stage, exmat_MCP_Clin_CMS_stage$Neutrophils, cms_stage, "Neutrophils", p_valores_cms_stage["Neutrophils"])
+# Endothelial cells
+bp9 <- boxplot_MCPcounter (exmat_MCP_Clin_CMS_stage, cms_stage, exmat_MCP_Clin_CMS_stage$`Endothelial cells`, cms_stage, "Endothelial cells", p_valores_cms_stage["Endothelial cells"])
+# Fibroblasts
+bp10 <- boxplot_MCPcounter (exmat_MCP_Clin_CMS_stage, cms_stage, exmat_MCP_Clin_CMS_stage$Fibroblasts, cms_stage, "Fibroblasts", p_valores_cms_stage["Fibroblasts"])
+
+require(patchwork)
+# En un grid 2x1
+bp1 + bp2  + plot_layout(ncol = 2, nrow = 1)
+bp3 + bp4 + plot_layout(ncol = 2, nrow = 1)
+bp5 + bp6 + plot_layout(ncol = 2, nrow = 1)
+bp7 +  bp8 + plot_layout(ncol = 2, nrow = 1)
+bp9 +  bp10 + plot_layout(ncol = 2, nrow = 1)
+```
+
 
 
 # Referencias  
