@@ -61,6 +61,7 @@ if(!(require(knitr))) install.packages("knitr")
 if(!(require(patchwork))) install.packages("patchwork")
 if(!(require(rmdformats))) install.packages("rmdformats")
 if(!(require(skimr))) install.packages("skimr")
+if(!(require(sqldf))) install.packages("sqldf")
 ```
 
 ``` {r funciones, include=FALSE}
@@ -1166,12 +1167,12 @@ bp9 +  bp10 + plot_layout(ncol = 2, nrow = 1)
 p5 + plot_layout(ncol = 2, nrow = 1)
 ```
 
-# Análisis HLA's
+# Análisis HLA's {.tabset .tabset-fade .tabset-pills}
 
-Hacemos un data frame con los datos de expresión de los genes del Complejo Mayor
-de Hitocompatibilidad I HLA-A, HLA-B, HLA-C y el gen marcador de las células NK
-NKp46 (NCR1 en nomenclatura SYMBOL). Además añadimos la columna HLA-ABC con la 
-suma de expresión de los 3 genes.  
+Hacemos un data frame con los datos de expresión de los genes del *Complejo Mayor
+de Hitocompatibilidad I HLA-A, HLA-B, HLA-C* y el gen marcador de las células NK,
+*NKp46* (*NCR1* en nomenclatura SYMBOL). Además añadimos la columna HLA-ABC con 
+la suma de expresión de los 3 genes.    
   
 ```{r chunck_HLA_1, echo=TRUE}
 # Creamos un df con los datos clínicos y los de expresión génica (transpuesta)
@@ -1191,6 +1192,138 @@ df_hla_nk_expression$`HLA-ABC` <- df_hla_nk_expression$`HLA-A` +
 # Añadimos los datos clínicos
 df_hla_nk_expression <- cbind(df_dataClin, df_hla_nk_expression)
 ```
+  
+## Gráfico de dispersión  
+
+```{r chunck_HLA_2, fig.width=10, fig.height=10, echo=TRUE}
+# Creamos el gráfico de dispersión
+pd1 <- ggplot(df_hla_nk_expression, aes(x = `HLA-ABC`, y = NCR1)) + 
+    # Agregamos puntos con colores y formas personalizados
+    geom_point(aes(shape = stage, color = msi_imputed, fill = msi_imputed), size = 3, stroke = 1) + # Agregar etiquetas y título
+    labs(title = "Gráfico de dispersión NKP46 vs HLA-ABC",
+       x = "HLA-ABC",
+       y = "NKP46 (NCR1)",
+       color = "MSI/MSS",
+       shape = "Stage") +
+    # Ajustar la escala de forma y relleno
+    # Shape: 21: círculo relleno, 24: triángulo relleno
+    scale_shape_manual(values = c(21, 24)) + 
+    scale_fill_manual(values = c("white", "dodgerblue4")) +
+    scale_color_manual(values = c("darkorange2", "dodgerblue4")) + 
+    # Personalizar el tema del gráfico
+    theme_classic() +
+    theme(
+      axis.line = element_line(color = "black"),
+      legend.position = c(0.1, 0.9)) +
+    # Quitamos la leyenda fill
+     guides(fill = "none")
+# Visualizamos
+pd1
+```
+
+Ajustamos un modelo lineal sin considerar interación entre *estadio* e *inestabilidad de microsatélites*
+
+```{r chunck_HLA_3, echo=TRUE}
+# Ajustamos un modelo lineal
+lmod <- lm(NCR1 ~ `HLA-ABC`, data = df_hla_nk_expression)
+# Summary del modelo
+summary(lmod)
+```
+
+- Hay una potencial relación positiva entre HLA-ABC y NCR1, pero no es 
+suficiente para afirmar que es significativa.
+- Débil explicación del modelo.  
+
+## Estadio II - MSI/MSS  
+
+```{r chunck_HLA_4, fig.width=10, fig.height=10, echo=TRUE}
+library(sqldf)
+# Seleccionamos estadio tipo II
+df_hla_nk_expression_II <- sqldf('SELECT * FROM df_hla_nk_expression WHERE stage = "II"')
+
+# Creamos el gráfico de dispersión para Estadio II
+pd2 <- ggplot(df_hla_nk_expression_II, aes(x = `HLA-ABC`, y = NCR1)) +
+  geom_point(aes(color = msi_imputed, shape = msi_imputed), size = 3, stroke = 1) +
+  labs(title = "Estadio II",
+       x = "HLA-ABC",
+       y = "NKP46 (NCR1)",
+       color = "MSI/MSS",
+       shape = "MSI/MSS") +
+  scale_shape_manual(values = c(16, 2)) +  # cuadrado lleno, triángulo
+  scale_color_manual(values = c("darkorange2", "dodgerblue4")) +
+  theme_classic() +
+  theme(
+    axis.line = element_line(color = "black"),
+    legend.position = c(0.1, 0.9))
+
+# Añadimos líneas de regresión lineal para cada grupo MSI y MSS
+pd2 <- pd2 + geom_smooth(method = "lm", aes(color = msi_imputed), se = FALSE)
+
+# Visualizamos el gráfico
+pd2
+```
+
+
+```{r chunck_HLA_5, fig.width=10, fig.height=10, echo=TRUE}
+# Ajustamos un modelo lineal para Estadio II
+lmod_ser <- lm(NCR1 ~ `HLA-ABC`*msi_imputed, data = df_hla_nk_expression_II)
+# Hacemos una contraste de paralelismo de rectas con anova
+anova(lmod_ser)
+```
+
+Vemos que hay significación en la hipótesis de paralelismo (Pr: 0.02811), no son
+paralelas, aunque no en la de coincidencia de las rectas (Pr: 0.41378). 
+Resultado de difícil interpretación: la significancia de la interacción sugiere 
+que el efecto de HLA-ABC sobre NCR1 depende del estado de msi_imputed o 
+viceversa. Esto significa que el impacto de una de estas variables en NCR1 no es
+constante y varía según el nivel de la otra variable.
+
+
+## Estadio III - MSI/MSS  
+
+```{r chunck_HLA_6, fig.width=10, fig.height=10, echo=TRUE}
+# Seleccionamos estadio tipo II
+df_hla_nk_expression_III <- sqldf('SELECT * FROM df_hla_nk_expression WHERE stage = "III"')
+
+# Creamos el gráfico de dispersión para Estadio II
+pd3 <- ggplot(df_hla_nk_expression_III, aes(x = `HLA-ABC`, y = NCR1)) +
+  geom_point(aes(color = msi_imputed, shape = msi_imputed), size = 3, stroke = 1) +
+  labs(title = "Estadio III",
+       x = "HLA-ABC",
+       y = "NKP46 (NCR1)",
+       color = "MSI/MSS",
+       shape = "MSI/MSS") +
+  scale_shape_manual(values = c(16, 2)) +  # cuadrado lleno, triángulo
+  scale_color_manual(values = c("darkorange2", "dodgerblue4")) +
+  theme_classic() +
+  theme(
+    axis.line = element_line(color = "black"),
+    legend.position = c(0.1, 0.9))
+
+# Añadimos líneas de regresión lineal para cada grupo MSI y MSS
+pd3 <- pd3 + geom_smooth(method = "lm", aes(color = msi_imputed), se = FALSE)
+
+# Visualizamos el gráfico
+pd3
+```
+
+
+```{r chunck_HLA_7, fig.width=10, fig.height=10, echo=TRUE}
+# Ajustamos un modelo lineal para Estadio II
+lmod_ser <- lm(NCR1 ~ `HLA-ABC`*msi_imputed, data = df_hla_nk_expression_III)
+# Hacemos una contraste de paralelismo de rectas con anova
+anova(lmod_ser)
+```
+
+En este caso no hay significación en la hipótesis de paralelismo (Pr: 0.738591) 
+aunque sí en la de coincidencia de las rectas (Pr: 0.006508). Resultado también 
+de difícil interpretación: los efectos principales de HLA-ABC y msi_imputed son 
+ambos estadísticamente significativos y aportan individualmente a la explicación
+de la variabilidad en NCR1, con msi_imputed mostrando un efecto algo más fuerte 
+según valor p más bajos.
+  
+Aquí se intuye una relación inversa entre la expresión de NCR1 y HLA-ABC; es 
+decir, una relación inversa entre infiltración de células NK y expresión de HLA's.
 
 
 # Referencias  
