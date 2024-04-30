@@ -54,11 +54,13 @@ Sys.setlocale("LC_TIME", "C")
 # Instalamos paquetes, si no lo están, en caso de ser requeridos
 if(!(require(bibtex))) install.packages("bibtex")
 # if(!(require(car))) install.packages("car") # Levene
+if(!(require(caret))) install.packages("caret")
 if(!(require(dplyr))) install.packages("dplyr")
 if(!(require(factoextra))) install.packages("factoextra")
 if(!(require(ggplot2))) install.packages("ggplot2")
 if(!(require(knitr))) install.packages("knitr")
 if(!(require(patchwork))) install.packages("patchwork")
+if(!(require(randomForest))) install.packages("randomForest")
 if(!(require(rmdformats))) install.packages("rmdformats")
 if(!(require(skimr))) install.packages("skimr")
 if(!(require(sqldf))) install.packages("sqldf")
@@ -1188,6 +1190,13 @@ df_hla_nk_expression <- df_data_clin_exmat[hla_nk_genes]
 # Añadimos la columna HLA-ABC con la suma de expresión de los 3 genes
 df_hla_nk_expression$`HLA-ABC` <- df_hla_nk_expression$`HLA-A` + 
   df_hla_nk_expression$`HLA-B` + df_hla_nk_expression$`HLA-C`
+# Calculamos la media de la columna HLA-ABC
+mean_hla_abc <- mean(df_hla_nk_expression$`HLA-ABC`, na.rm = TRUE)
+
+# Añadir una nueva columna que indique si el nivel de HLA-ABC es 'Low' o 'High'
+df_hla_nk_expression$HLA_ABC_cat <- ifelse(df_hla_nk_expression$`HLA-ABC` < mean_hla_abc, 'Low', 'High')
+# Convertimos la columna 'HLA_ABC_cat' a factor
+df_hla_nk_expression$HLA_ABC_cat <- factor(df_hla_nk_expression$HLA_ABC_cat, levels = c('Low', 'High'))
 
 # Añadimos los datos clínicos
 df_hla_nk_expression <- cbind(df_dataClin, df_hla_nk_expression)
@@ -1323,8 +1332,187 @@ de la variabilidad en NCR1, con msi_imputed mostrando un efecto algo más fuerte
 según valor p más bajos.
   
 Aquí se intuye una relación inversa entre la expresión de NCR1 y HLA-ABC; es 
-decir, una relación inversa entre infiltración de células NK y expresión de HLA's.
+decir, una relación inversa entre infiltración de células NK y expresión de 
+HLA's.
+  
+  
+# Algoritmo Random Forest (ML) {.tabset .tabset-fade .tabset-pills}
 
+El algoritmo "Random Forest" es un método de aprendizaje supervisado utilizado 
+para la clasificación en el campo de machine learning (ML). 
+Se utilizan en una amplia gama de campos como, por ejemplo, en el diagnóstico médico.  
+Aplicaremos este algoritmo a nuestros datos para clasificar los CRC así como el 
+estadio de los mismos.
+
+```{r chunck_ML_función}
+library(randomForest)
+library(caret)
+library(dplyr)
+
+# Función para crear y evaluar un modelo Random Forest con 100 árboles
+run_randomForest_model <- function(data, target_name = 'class', p_train = 0.67, 
+                                   seed = 12357, ntree = 100) {
+  set.seed(seed)
+  
+  # Preparamos los datos
+  clean_data <- na.omit(data)
+  # Obtenemos el número total de filas (datos)
+  # n <- nrow(clean_data)
+  # Obtenemos los índices de filas al azar para entrenamiento
+  # indices_train <- sample(1:n, round(p_train * n))
+  
+  # Usar createDataPartition para obtener índices de entrenamiento
+  indices_train <- createDataPartition(y = clean_data$class, p = params$p.train, list = FALSE)
+
+  # Seleccionamos las filas para entrenamiento
+  data_train <- clean_data[indices_train, ]
+  # Seleccionamos las filas restantes para pruebas
+  data_test <- clean_data[-indices_train, ]
+  # Creamos los labels de class de "train"
+  train_labels <- data_train[[target_name]]
+  # Creamos los labels de class de "test"
+  test_labels <- data_test[[target_name]]
+  
+  # Creamos el modelo
+  model <- randomForest(data_train[-1], train_labels, ntree = ntree)
+  
+  # Predicción y evaluación
+  predictions <- predict(model, data_test[-1], type = "response")
+  results <- confusionMatrix(table(predictions, test_labels))
+  
+  return(list(model = model, results = results))
+}
+```
+  
+## Estadio
+
+```{r chunck_ML_stage}
+# Añadimos la variable "class" que queramos para los modelos ML
+df_exmat_stage <- cbind(df_dataClin['stage'], df_exmat_t)
+# Cambiamos el nombre de la primera columna a 'class'
+names(df_exmat_stage)[1] <- "class"
+# Ejecutamos el modelo Random Forest
+model_results <- run_randomForest_model(df_exmat_stage)
+
+# Vemos la información del modelo
+model_results$model
+# Vemos el summary del modelo
+# summary(model_results$model)
+# Vemos los resultados de la Matriz de Confusión de las predicciones (test)
+print(model_results$results)
+
+# Regogemos los datos para comparar de la predicción 
+stage_Accuracy <- model_results$results$overall["Accuracy"]
+stage_Kappa <- model_results$results$overall["Kappa"]
+stage_AccuracyLower <- model_results$results$overall["AccuracyLower"]
+stage_AccuracyUpper <- model_results$results$overall["AccuracyUpper"]
+```
+
+## MSI/MSS
+
+```{r chunck_ML_msi}
+# Añadimos la variable "class" que queramos para los modelos ML
+df_exmat_msi <- cbind(df_dataClin['msi_imputed'], df_exmat_t)
+# Cambiamos el nombre de la primera columna a 'class'
+names(df_exmat_msi)[1] <- "class"
+# Ejecutamos el modelo Random Forest
+model_results <- run_randomForest_model(df_exmat_msi, ntree = 200)
+
+# Vemos la información del modelo
+model_results$model
+# Vemos el summary del modelo
+# summary(model_results$model)
+# Vemos los resultados de la Matriz de Confusión de las predicciones (test)
+print(model_results$results)
+
+# Regogemos los datos para comparar de la predicción 
+msi_Accuracy <- model_results$results$overall["Accuracy"]
+msi_Kappa <- model_results$results$overall["Kappa"]
+msi_AccuracyLower <- model_results$results$overall["AccuracyLower"]
+msi_AccuracyUpper <- model_results$results$overall["AccuracyUpper"]
+```
+
+## MSI/MSS-Estadio
+
+```{r chunck_ML_msi_stage}
+# Añadimos la variable "class" que queramos para los modelos ML
+df_exmat_msi_stage <- cbind(df_dataClin['grupo'], df_exmat_t)
+# Cambiamos el nombre de la primera columna a 'class'
+names(df_exmat_msi_stage)[1] <- "class"
+# Ejecutamos el modelo Random Forest
+model_results <- run_randomForest_model(df_exmat_msi_stage, ntree = 200)
+
+# Vemos la información del modelo
+model_results$model
+# Vemos el summary del modelo
+# summary(model_results$model)
+# Vemos los resultados de la Matriz de Confusión de las predicciones (test)
+print(model_results$results)
+
+# Regogemos los datos para comparar de la predicción 
+msi_stage_Accuracy <- model_results$results$overall["Accuracy"]
+msi_stage_Kappa <- model_results$results$overall["Kappa"]
+msi_stage_AccuracyLower <- model_results$results$overall["AccuracyLower"]
+msi_stage_AccuracyUpper <- model_results$results$overall["AccuracyUpper"]
+```
+
+## CMS
+
+```{r chunck_ML_cms}
+# Añadimos la variable "class" que queramos para los modelos ML
+df_exmat_cms <- cbind(df_dataClin['cms'], df_exmat_t)
+# Cambiamos el nombre de la primera columna a 'class'
+names(df_exmat_cms)[1] <- "class"
+# Ejecutamos el modelo Random Forest
+model_results <- run_randomForest_model(df_exmat_cms)
+
+# Vemos la información del modelo
+model_results$model
+# Vemos el summary del modelo
+# summary(model_results$model)
+# Vemos los resultados de la Matriz de Confusión de las predicciones (test)
+print(model_results$results)
+
+# Regogemos los datos para comparar de la predicción 
+cms_Accuracy <- model_results$results$overall["Accuracy"]
+cms_Kappa <- model_results$results$overall["Kappa"]
+cms_AccuracyLower <- model_results$results$overall["AccuracyLower"]
+cms_AccuracyUpper <- model_results$results$overall["AccuracyUpper"]
+```
+  
+## CMS-Estadio
+
+```{r chunck_ML_cms_stage}
+# Añadimos la variable "class" que queramos para los modelos ML
+df_exmat_cms_stage <- cbind(df_dataClin['cms_stage'], df_exmat_t)
+# Cambiamos el nombre de la primera columna a 'class'
+names(df_exmat_cms_stage)[1] <- "class"
+# Ejecutamos el modelo Random Forest
+model_results <- run_randomForest_model(df_exmat_cms_stage, ntree = 200)
+
+# Vemos la información del modelo
+model_results$model
+# Vemos el summary del modelo
+# summary(model_results$model)
+# Vemos los resultados de la Matriz de Confusión de las predicciones (test)
+print(model_results$results)
+
+# Regogemos los datos para comparar de la predicción 
+cms_stage_Accuracy <- model_results$results$overall["Accuracy"]
+cms_stage_Kappa <- model_results$results$overall["Kappa"]
+cms_stage_AccuracyLower <- model_results$results$overall["AccuracyLower"]
+cms_stage_AccuracyUpper <- model_results$results$overall["AccuracyUpper"]
+```  
+  
+## Resultados  
+
+Modelo|Accuraccy|kappa|95% CI
+:----|:----|:----:|:----:
+Estadio|`r stage_Accuracy`|`r stage_Kappa`|(`r stage_AccuracyLower` - `r stage_AccuracyUpper`)
+MSI/MSS|`r msi_Accuracy`|`r msi_Kappa`|(`r msi_AccuracyLower` - `r msi_AccuracyUpper`)
+MSI/MSS-Estadio|`r msi_stage_Accuracy`|`r msi_stage_Kappa`|(`r msi_stage_AccuracyLower` - `r msi_stage_AccuracyUpper`)
+CMS|`r cms_Accuracy`|`r cms_Kappa`|(`r cms_AccuracyLower` - `r cms_AccuracyUpper`)
+CMS-Estadio|`r cms_stage_Accuracy`|`r cms_stage_Kappa`|(`r cms_stage_AccuracyLower` - `r cms_stage_AccuracyUpper`)
 
 # Referencias  
 
