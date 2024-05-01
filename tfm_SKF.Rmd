@@ -1186,7 +1186,7 @@ df_data_clin_exmat <- cbind(df_dataClin, df_exmat_t)
 
 # Nos quedamos solo con los genes del complejo mayor de hitocompatibilidad I 
 # HLA-ABC y con el marcador de células NK, el gen NKp46 (NCR1 en nomenclatura SYMBOL) 
-hla_nk_genes <- c("HLA-A", "HLA-B", "HLA-C", "NCR1")
+hla_nk_genes <- c("HLA-A", "HLA-B", "HLA-C", "HLA-E", "NCR1")
 df_hla_nk_expression <- df_data_clin_exmat[hla_nk_genes]
 # Añadimos la columna HLA-ABC con la suma de expresión de los 3 genes
 df_hla_nk_expression$`HLA-ABC` <- df_hla_nk_expression$`HLA-A` + 
@@ -1197,16 +1197,23 @@ df_hla_nk_expression$`HLA-ABC` <- df_hla_nk_expression$`HLA-A` +
 median_hla_abc <- median(df_hla_nk_expression$`HLA-ABC`, na.rm = TRUE)
 # Calculamos la mediana de la columna HLA-A
 median_hla_a <- median(df_hla_nk_expression$`HLA-A`, na.rm = TRUE)
+# Calculamos la mediana de la columna HLA-E
+median_hla_e <- median(df_hla_nk_expression$`HLA-E`, na.rm = TRUE)
 
 # Añadimos una nueva columna que indique si el nivel de HLA-ABC es 'Low' o 'High'
 df_hla_nk_expression$HLA_ABC_cat <- ifelse(df_hla_nk_expression$`HLA-ABC` < median_hla_abc, 'Low', 'High')
 # Convertimos la columna 'HLA_ABC_cat' a factor
 df_hla_nk_expression$HLA_ABC_cat <- factor(df_hla_nk_expression$HLA_ABC_cat, levels = c('Low', 'High'))
 
-# Añadimos una nueva columna que indique si el nivel de HLA-ABC es 'Low' o 'High'
+# Añadimos una nueva columna que indique si el nivel de HLA-A es 'Low' o 'High'
 df_hla_nk_expression$HLA_A_cat <- ifelse(df_hla_nk_expression$`HLA-A` < median_hla_a, 'Low', 'High')
-# Convertimos la columna 'HLA_ABC_cat' a factor
+# Convertimos la columna 'HLA_A_cat' a factor
 df_hla_nk_expression$HLA_A_cat <- factor(df_hla_nk_expression$HLA_A_cat, levels = c('Low', 'High'))
+
+# Añadimos una nueva columna que indique si el nivel de HLA-E es 'Low' o 'High'
+df_hla_nk_expression$HLA_E_cat <- ifelse(df_hla_nk_expression$`HLA-E` < median_hla_e, 'Low', 'High')
+# Convertimos la columna 'HLA_A_cat' a factor
+df_hla_nk_expression$HLA_E_cat <- factor(df_hla_nk_expression$HLA_E_cat, levels = c('Low', 'High'))
 
 # Añadimos los datos clínicos
 df_hla_nk_expression <- cbind(df_dataClin, df_hla_nk_expression)
@@ -1498,6 +1505,82 @@ bp35 + bp36 + bp37 + bp38 +plot_layout(ncol = 2, nrow = 2)
 ```
 
 Nos da significación en el primer caso StageII, MSI. 
+
+## Boxplot HLA-E Cat vs NKp46
+
+Boxplot comparando la expresión del gen NKp46 entre las categorías baja (Low) y 
+alta (High) de HLA-E. Para realizar las categorías  se ha utilizado la mediana
+de la expresión génica como punto de corte.  
+Se ha estratificando por estadio y MSI/MSS. 
+Utilizamos el test no paramétrico de Wilcoxon para evaluar las diferencias.  
+
+```{r chunck_HLA_10, fig.width=10, fig.height=10, echo=TRUE}
+library(sqldf)
+# Boxplot StageII, MSI
+df_hla_nk_expression_II_msi <- sqldf('SELECT * FROM df_hla_nk_expression WHERE stage = "II" AND msi_imputed = "MSI"')
+# Realizamos el test de Mann-Whitney U para los grupos Low y High
+nLow <- df_hla_nk_expression_II_msi$NCR1[df_hla_nk_expression_II_msi$HLA_E_cat == "Low"]
+nHigh <- df_hla_nk_expression_II_msi$NCR1[df_hla_nk_expression_II_msi$HLA_E_cat == "High"]
+mwU_II_msi_test <- wilcox.test(nLow, nHigh, alternative = "two.sided")
+# Boxplot
+bp39 <- boxplot_MCPcounter(data = df_hla_nk_expression_II_msi, 
+                          x=df_hla_nk_expression_II_msi$HLA_E_cat, 
+                          y=df_hla_nk_expression_II_msi$NCR1, 
+                          fill=df_hla_nk_expression_II_msi$HLA_E_cat, 
+                          title= "StageII, MSI", 
+                          p_value=mwU_II_msi_test$p.value, 
+                          xlabel="HLA_E", ylabel="NKP46")
+# Boxplot StageII, MSS
+df_hla_nk_expression_II_mss <- sqldf('SELECT * FROM df_hla_nk_expression WHERE stage = "II" AND msi_imputed = "MSS"')
+# Realizamos el test de Mann-Whitney U para los grupos Low y High
+nLow <- df_hla_nk_expression_II_mss$NCR1[df_hla_nk_expression_II_mss$HLA_E_cat == "Low"]
+nHigh <- df_hla_nk_expression_II_mss$NCR1[df_hla_nk_expression_II_mss$HLA_E_cat == "High"]
+mwU_II_mss_test <- wilcox.test(nLow, nHigh, alternative = "two.sided")
+# Boxplot
+bp40 <- boxplot_MCPcounter(data = df_hla_nk_expression_II_mss, 
+                          x=df_hla_nk_expression_II_mss$HLA_E_cat, 
+                          y=df_hla_nk_expression_II_mss$NCR1, 
+                          fill=df_hla_nk_expression_II_mss$HLA_E_cat, 
+                          title= "StageII, MSS", 
+                          p_value=mwU_II_mss_test$p.value, 
+                          xlabel="HLA_E", ylabel="NKP46")
+# Boxplot StageIII, MSI
+df_hla_nk_expression_III_msi <- sqldf('SELECT * FROM df_hla_nk_expression WHERE stage = "III" AND msi_imputed = "MSI"')
+# Realizamos el test de Mann-Whitney U para los grupos Low y High
+nLow <- df_hla_nk_expression_III_msi$NCR1[df_hla_nk_expression_III_msi$HLA_E_cat == "Low"]
+nHigh <- df_hla_nk_expression_III_msi$NCR1[df_hla_nk_expression_III_msi$HLA_E_cat == "High"]
+mwU_III_msi_test <- wilcox.test(nLow, nHigh, alternative = "two.sided")
+# Boxplot
+bp41 <- boxplot_MCPcounter(data = df_hla_nk_expression_III_msi, 
+                          x=df_hla_nk_expression_III_msi$HLA_E_cat, 
+                          y=df_hla_nk_expression_III_msi$NCR1, 
+                          fill=df_hla_nk_expression_III_msi$HLA_E_cat, 
+                          title= "StageIII, MSI", 
+                          p_value=mwU_III_msi_test$p.value, 
+                          xlabel="HLA_E", ylabel="NKP46")
+# Boxplot StageIII, MSS
+df_hla_nk_expression_III_mss <- sqldf('SELECT * FROM df_hla_nk_expression WHERE stage = "III" AND msi_imputed = "MSS"')
+# Realizamos el test de Mann-Whitney U para los grupos Low y High
+nLow <- df_hla_nk_expression_III_mss$NCR1[df_hla_nk_expression_III_mss$HLA_E_cat == "Low"]
+nHigh <- df_hla_nk_expression_III_mss$NCR1[df_hla_nk_expression_III_mss$HLA_E_cat == "High"]
+mwU_III_mss_test <- wilcox.test(nLow, nHigh, alternative = "two.sided")
+# Boxplot
+bp42 <- boxplot_MCPcounter(data = df_hla_nk_expression_III_mss, 
+                          x=df_hla_nk_expression_III_mss$HLA_E_cat, 
+                          y=df_hla_nk_expression_III_mss$NCR1, 
+                          fill=df_hla_nk_expression_III_mss$HLA_E_cat, 
+                          title= "StageIII, MSS", 
+                          p_value=mwU_III_mss_test$p.value, 
+                          xlabel="HLA_E", ylabel="NKP46")
+
+# Visualizamos los gráficos
+require(patchwork)
+# En un grid 2x2
+bp39 + bp40 + bp41 + bp42 +plot_layout(ncol = 2, nrow = 2)
+```
+
+Nos da significación en los casos StageII, MSS y StageIII, MSS. 
+
 
 # Algoritmo Random Forest (ML) {.tabset .tabset-fade .tabset-pills}
 
