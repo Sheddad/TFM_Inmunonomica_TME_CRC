@@ -799,6 +799,12 @@ bp7 + bp8 + bp9 + plot_layout(ncol = 3, nrow = 1)
 bp10 + plot_layout(ncol = 3, nrow = 1)
 ```
 
+```{r chunck_4_1_2_3, fig.width=15, fig.height=15, echo=TRUE}
+# Todos juntos para el informe del TFM 11/06/2024
+bp1 + bp2 + bp3 + bp4 + bp5 + bp6 + bp7 + bp8 + bp9 + bp10 + plot_layout(ncol = 4, nrow = 3)
+```
+
+
 ### Infiltración NKs
 
 **NORMALIDAD Y HOMOCEDASTICIDAD**
@@ -1172,28 +1178,27 @@ df_hla_nk_expression$HLA_A_cat <- ifelse(df_hla_nk_expression$`HLA-A` < median_h
 # Convertimos la columna 'HLA_A_cat' a factor
 df_hla_nk_expression$HLA_A_cat <- factor(df_hla_nk_expression$HLA_A_cat, levels = c('Low', 'High'))
 
-# Añadimos una nueva columna que indique si el nivel de HLA-A es 'Low' o 'High'
+# Añadimos una nueva columna que indique si el nivel de HLA-B es 'Low' o 'High'
 df_hla_nk_expression$HLA_B_cat <- ifelse(df_hla_nk_expression$`HLA-B` < median_hla_b, 'Low', 'High')
-# Convertimos la columna 'HLA_A_cat' a factor
+# Convertimos la columna 'HLA_B_cat' a factor
 df_hla_nk_expression$HLA_B_cat <- factor(df_hla_nk_expression$HLA_B_cat, levels = c('Low', 'High'))
 
-# Añadimos una nueva columna que indique si el nivel de HLA-A es 'Low' o 'High'
+# Añadimos una nueva columna que indique si el nivel de HLA-C es 'Low' o 'High'
 df_hla_nk_expression$HLA_C_cat <- ifelse(df_hla_nk_expression$`HLA-C` < median_hla_c, 'Low', 'High')
-# Convertimos la columna 'HLA_A_cat' a factor
+# Convertimos la columna 'HLA_C_cat' a factor
 df_hla_nk_expression$HLA_C_cat <- factor(df_hla_nk_expression$HLA_C_cat, levels = c('Low', 'High'))
 
 # Añadimos una nueva columna que indique si el nivel de HLA-E es 'Low' o 'High'
 df_hla_nk_expression$HLA_E_cat <- ifelse(df_hla_nk_expression$`HLA-E` < median_hla_e, 'Low', 'High')
-# Convertimos la columna 'HLA_A_cat' a factor
+# Convertimos la columna 'HLA_E_cat' a factor
 df_hla_nk_expression$HLA_E_cat <- factor(df_hla_nk_expression$HLA_E_cat, levels = c('Low', 'High'))
 
 # Añadimos los datos clínicos
 df_hla_nk_expression <- cbind(exmat_MCP_Clin, df_hla_nk_expression)
 ```
-  
-## Gráfico de dispersión  
 
-```{r chunck_HLA_2, fig.width=10, fig.height=10, echo=TRUE}
+
+```{r chunck_HLA_2, fig.width=10, fig.height=10, echo=FALSE, include = FALSE}
 # Creamos el gráfico de dispersión
 pd1 <- ggplot(df_hla_nk_expression, aes(x = `HLA-A`, y = NCR1)) + 
     # Agregamos puntos con colores y formas personalizados
@@ -1219,20 +1224,73 @@ pd1 <- ggplot(df_hla_nk_expression, aes(x = `HLA-A`, y = NCR1)) +
 pd1
 ```
 
-Ajustamos un modelo lineal sin considerar interación entre *estadio* e *inestabilidad de microsatélites*
 
-```{r chunck_HLA_3, echo=TRUE}
+```{r chunck_HLA_3, echo=FALSE, include = FALSE}
+# Ajustamos un modelo lineal sin considerar interación entre *estadio* e *inestabilidad de microsatélites*
+
 # Ajustamos un modelo lineal
-lmod <- lm(NCR1 ~ `HLA-ABC`, data = df_hla_nk_expression)
+lmod <- lm(NCR1 ~ `HLA-A`, data = df_hla_nk_expression)
 # Summary del modelo
 summary(lmod)
+
+# - Hay una potencial relación positiva entre HLA-A y NCR1, pero no es 
+# suficiente para afirmar que es significativa.
+# - Débil explicación del modelo.  
 ```
 
-- Hay una potencial relación positiva entre HLA-ABC y NCR1, pero no es 
-suficiente para afirmar que es significativa.
-- Débil explicación del modelo.  
+## HLA-A {.tabset}
 
-## Estadio II - MSI/MSS  
+### Boxplot HLA-A Cat vs NKp46
+
+Boxplot comparando la expresión del gen NKp46 entre las categorías baja (Low) y 
+alta (High) de HLA-A. Para realizar las categorías  se ha utilizado la mediana
+de la expresión génica como punto de corte.  
+Se ha estratificando por estadio y MSI/MSS. 
+Utilizamos el test no paramétrico de Wilcoxon para evaluar las diferencias.  
+
+```{r chunck_HLA_8, fig.width=10, fig.height=10, echo=TRUE}
+# Función para generar gráficos de caja y pruebas de Mann-Whitney U
+boxplot_MWU <- function(data, stage, msi, hla_var, nk_var, title_prefix) {
+  # Filtrar los datos
+  df_filtered <- sqldf(paste0("SELECT * FROM df_hla_nk_expression WHERE stage = '", stage, "' AND msi_imputed = '", msi, "'"))
+  
+  # Realizar el test de Mann-Whitney U para los grupos Low y High
+  nLow <- df_filtered$NCR1[df_filtered[[hla_var]] == "Low"]
+  nHigh <- df_filtered$NCR1[df_filtered[[hla_var]] == "High"]
+  mwU_test <- wilcox.test(nLow, nHigh, alternative = "two.sided")
+  
+  # Generar el título completo
+  title <- paste0(title_prefix, ", ", stage, ", ", msi)
+  
+  # Generar el boxplot
+  bp <- boxplot_MCPcounter(data = df_filtered, 
+                           x = df_filtered[[hla_var]], 
+                           y = df_filtered[[nk_var]], 
+                           fill = df_filtered[[hla_var]], 
+                           title = title, 
+                           p_value = mwU_test$p.value, 
+                           xlabel = hla_var, ylabel = nk_var)
+  
+  return(bp)
+}
+```
+
+```{r chunck_HLA_8_1, fig.width=10, fig.height=10, echo=TRUE}
+# Generar los gráficos para cada combinación de stage, msi y HLA variable
+bp35 <- boxplot_MWU(data = df_hla_nk_expression, stage = "II", msi = "MSI", hla_var = "HLA_A_cat", nk_var = "NCR1", title_prefix = "StageII")
+bp36 <- boxplot_MWU(data = df_hla_nk_expression, stage = "II", msi = "MSS", hla_var = "HLA_A_cat", nk_var = "NCR1", title_prefix = "StageII")
+bp37 <- boxplot_MWU(data = df_hla_nk_expression, stage = "III", msi = "MSI", hla_var = "HLA_A_cat", nk_var = "NCR1", title_prefix = "StageIII")
+bp38 <- boxplot_MWU(data = df_hla_nk_expression, stage = "III", msi = "MSS", hla_var = "HLA_A_cat", nk_var = "NCR1", title_prefix = "StageIII")
+
+# Visualizar los gráficos en un grid 2x2 (patchwork)
+bp35 + bp36 + bp37 + bp38 + plot_layout(ncol = 2, nrow = 2)
+```
+
+No da significación en ningún caso. 
+No hay una diferencia signficativa en la mediana de la expresión del gen NCR1 
+entre los grupos con baja y alta expresión de HLA-A.
+
+### Estadio II - MSI/MSS HLA-A 
 
 ```{r chunck_HLA_4, fig.width=10, fig.height=10, echo=TRUE}
 # Seleccionamos estadio tipo II
@@ -1268,15 +1326,23 @@ lmod_ser <- lm(NCR1 ~ `HLA-A`*msi_imputed, data = df_hla_nk_expression_II)
 anova(lmod_ser)
 ```
 
-Vemos que hay significación en la hipótesis de paralelismo (Pr: 0.02811), no son
-paralelas, aunque no en la de coincidencia de las rectas (Pr: 0.41378). 
-Resultado de difícil interpretación: la significancia de la interacción sugiere 
-que el efecto de HLA-ABC sobre NCR1 depende del estado de msi_imputed o 
-viceversa. Esto significa que el impacto de una de estas variables en NCR1 no es
-constante y varía según el nivel de la otra variable.
+El efecto principal de HLA-A sobre NCR1 no es significativo (p = 0.641981). Esto
+sugiere que no hay suficiente evidencia para concluir que HLA-A tiene un efecto significativo en NCR1 por sí solo.  
 
+El efecto msi_imputed sobre NCR1 no es significativo (p = 0.159859). Esto indica que no hay suficiente evidencia para concluir que msi_imputed tiene un efecto significativo en NCR1 por sí solo.
 
-## Estadio III - MSI/MSS  
+Vemos que hay significación en la hipótesis de paralelismo (Pr: 0.002474).La 
+interacción entre HLA-A y msi_imputed es significativa. Esto indica que el 
+efecto de HLA-A sobre NCR1 depende de los valores de msi_imputed. Dado que el 
+p-valor es menor que 0.01 (**), hay una fuerte evidencia contra la hipótesis 
+nula de que no hay interacción entre HLA-A y msi_imputed.
+
+Aquí se observa para los tumores MSI una relación inversa entre la expresión de 
+NCR1 y HLA-A; Cuanta menor expresión de HLA's hay una mayor expresión de NKp46,
+es decir, cuanta menor expresión de HLA-A hay una mayor infiltración de células 
+NK activadas.
+
+### Estadio III - MSI/MSS HLA-A 
 
 ```{r chunck_HLA_6, fig.width=10, fig.height=10, echo=TRUE}
 # Seleccionamos estadio tipo II
@@ -1312,6 +1378,20 @@ lmod_ser <- lm(NCR1 ~ `HLA-A`*msi_imputed, data = df_hla_nk_expression_III)
 anova(lmod_ser)
 ```
 
+El efecto principal de HLA-A sobre NCR1 es significativo (p = 0.028028). Esto 
+sugiere que hay una relación significativa entre HLA-A y NCR1 por sí solo. Dado 
+que el p-valor es menor que 0.05 (*), hay suficiente evidencia para rechazar la 
+hipótesis nula de que HLA-A no tiene un efecto sobre NCR1.
+
+El efecto principal de msi_imputed sobre NCR1 es significativo (p = 0.005213). 
+Esto indica que hay una relación significativa entre msi_imputed y NCR1 por sí 
+solo. Dado que el p-valor es menor que 0.01 (**), hay una fuerte evidencia para 
+rechazar la hipótesis nula de que msi_imputed no tiene un efecto sobre NCR1.
+
+La interacción entre HLA-A y msi_imputed no es significativa (p = 0.815465). 
+Esto indica que no hay suficiente evidencia para concluir que el efecto de HLA-A
+sobre NCR1 depende de los valores de msi_imputed.
+
 En este caso no hay significación en la hipótesis de paralelismo (Pr: 0.738591) 
 aunque sí en la de coincidencia de las rectas (Pr: 0.006508). Resultado también 
 de difícil interpretación: los efectos principales de HLA-ABC y msi_imputed son 
@@ -1319,64 +1399,13 @@ ambos estadísticamente significativos y aportan individualmente a la explicaci�
 de la variabilidad en NCR1, con msi_imputed mostrando un efecto algo más fuerte 
 según valor p más bajos.
   
-Aquí se intuye una relación inversa entre la expresión de NCR1 y HLA-ABC; es 
+Aquí se intuye una relación inversa entre la expresión de NCR1 y HLA-A; es 
 decir, una relación inversa entre infiltración de células NK y expresión de 
 HLA's.
   
-  
-## Boxplot HLA-A Cat vs NKp46
+## HLA-B {.tabset}
 
-Boxplot comparando la expresión del gen NKp46 entre las categorías baja (Low) y 
-alta (High) de HLA-A. Para realizar las categorías  se ha utilizado la mediana
-de la expresión génica como punto de corte.  
-Se ha estratificando por estadio y MSI/MSS. 
-Utilizamos el test no paramétrico de Wilcoxon para evaluar las diferencias.  
-
-```{r chunck_HLA_8, fig.width=10, fig.height=10, echo=FALSE}
-# Función para generar gráficos de caja y pruebas de Mann-Whitney U
-boxplot_MWU <- function(data, stage, msi, hla_var, nk_var, title_prefix) {
-  # Filtrar los datos
-  df_filtered <- sqldf(paste0("SELECT * FROM df_hla_nk_expression WHERE stage = '", stage, "' AND msi_imputed = '", msi, "'"))
-  
-  # Realizar el test de Mann-Whitney U para los grupos Low y High
-  nLow <- df_filtered$NCR1[df_filtered[[hla_var]] == "Low"]
-  nHigh <- df_filtered$NCR1[df_filtered[[hla_var]] == "High"]
-  mwU_test <- wilcox.test(nLow, nHigh, alternative = "two.sided")
-  
-  # Generar el título completo
-  title <- paste0(title_prefix, ", ", stage, ", ", msi)
-  
-  # Generar el boxplot
-  bp <- boxplot_MCPcounter(data = df_filtered, 
-                           x = df_filtered[[hla_var]], 
-                           y = df_filtered[[nk_var]], 
-                           fill = df_filtered[[hla_var]], 
-                           title = title, 
-                           p_value = mwU_test$p.value, 
-                           xlabel = hla_var, ylabel = nk_var)
-  
-  return(bp)
-}
-```
-
-```{r chunck_HLA_8_1, fig.width=10, fig.height=10, echo=TRUE}
-# Generar los gráficos para cada combinación de stage, msi y HLA variable
-  
-# Generar los gráficos para cada combinación de stage, msi y HLA variable
-bp35 <- boxplot_MWU(data = df_hla_nk_expression, stage = "II", msi = "MSI", hla_var = "HLA_A_cat", nk_var = "NCR1", title_prefix = "StageII")
-bp36 <- boxplot_MWU(data = df_hla_nk_expression, stage = "II", msi = "MSS", hla_var = "HLA_A_cat", nk_var = "NCR1", title_prefix = "StageII")
-bp37 <- boxplot_MWU(data = df_hla_nk_expression, stage = "III", msi = "MSI", hla_var = "HLA_A_cat", nk_var = "NCR1", title_prefix = "StageIII")
-bp38 <- boxplot_MWU(data = df_hla_nk_expression, stage = "III", msi = "MSS", hla_var = "HLA_A_cat", nk_var = "NCR1", title_prefix = "StageIII")
-
-# Visualizar los gráficos en un grid 2x2 (patchwork)
-bp35 + bp36 + bp37 + bp38 + plot_layout(ncol = 2, nrow = 2)
-```
-
-No da significación en ningún caso. 
-No hay una diferencia signficativa en la mediana de la expresión del gen NCR1 
-entre los grupos con baja y alta expresión de HLA-A.
-
-## Boxplot HLA-B Cat vs NKp46
+### Boxplot HLA-B Cat vs NKp46
 
 Boxplot comparando la expresión del gen NKp46 entre las categorías baja (Low) y 
 alta (High) de HLA-B. Para realizar las categorías  se ha utilizado la mediana
@@ -1398,7 +1427,9 @@ bp39 + bp40 + bp41 + bp42 + plot_layout(ncol = 2, nrow = 2)
 
 Nos da significación en el primer caso StageII, MSI. 
 
-## Boxplot HLA-C Cat vs NKp46
+## HLA-C {.tabset}
+
+### Boxplot HLA-C Cat vs NKp46
 
 Boxplot comparando la expresión del gen NKp46 entre las categorías baja (Low) y 
 alta (High) de HLA-C. Para realizar las categorías  se ha utilizado la mediana
@@ -1419,7 +1450,9 @@ bp43 + bp44 + bp45 + bp46 + plot_layout(ncol = 2, nrow = 2)
 
 Nos da significación en los casos StageII, MSS y StageIII, MSS. 
 
-## Boxplot HLA-E Cat vs NKp46
+## HLA-E {.tabset}
+
+### Boxplot HLA-E Cat vs NKp46
 
 Boxplot comparando la expresión del gen NKp46 entre las categorías baja (Low) y 
 alta (High) de HLA-E. Para realizar las categorías  se ha utilizado la mediana
@@ -1427,7 +1460,7 @@ de la expresión génica como punto de corte.
 Se ha estratificando por estadio y MSI/MSS. 
 Utilizamos el test no paramétrico de Wilcoxon para evaluar las diferencias.  
 
-```{r chunck_HLA_11, fig.width=10, fig.height=10, echo=TRUE}
+```{r chunck_HLA_15, fig.width=10, fig.height=10, echo=TRUE}
 
 bp47 <- boxplot_MWU(data = df_hla_nk_expression, stage = "II", msi = "MSI", hla_var = "HLA_E_cat", nk_var = "NCR1", title_prefix = "StageII")
 bp48 <- boxplot_MWU(data = df_hla_nk_expression, stage = "II", msi = "MSS", hla_var = "HLA_E_cat", nk_var = "NCR1", title_prefix = "StageII")
@@ -1440,11 +1473,62 @@ bp47 + bp48 + bp49 + bp50 + plot_layout(ncol = 2, nrow = 2)
 
 Nos da significación en los casos StageII, MSS y StageIII, MSS. 
 
+### MSS Estadio II/III HLA-E 
+
+```{r chunck_HLA_11, fig.width=10, fig.height=10, echo=TRUE}
+# Seleccionamos estadio tipo II ya lo hemos hecho antes
+df_hla_nk_expression_MSS <- sqldf('SELECT * FROM df_hla_nk_expression WHERE msi_imputed = "MSS"')
+
+# Creamos el gráfico de dispersión para Estadio II
+pd4 <- ggplot(df_hla_nk_expression_MSS, aes(x = `HLA-E`, y = NCR1)) +
+  geom_point(aes(color = stage, shape = stage), size = 3, stroke = 1) +
+  labs(title = "MSS",
+       x = "HLA-E",
+       y = "NKP46 (NCR1)",
+       color = "II/III",
+       shape = "II/III") +
+  scale_shape_manual(values = c(16, 2)) +  # cuadrado lleno, triángulo
+  scale_color_manual(values = c("darkorange2", "dodgerblue4")) +
+  theme_classic() +
+  theme(
+    axis.line = element_line(color = "black"),
+    legend.position = c(0.1, 0.9))
+
+# Añadimos líneas de regresión lineal para cada grupo MSI y MSS
+pd4 <- pd4 + geom_smooth(method = "lm", aes(color = stage), se = FALSE)
+
+# Visualizamos el gráfico
+pd4
+```
+
+
+```{r chunck_HLA_12, fig.width=10, fig.height=10, echo=TRUE}
+# Ajustamos un modelo lineal para Estadio II
+lmod_ser <- lm(NCR1 ~ `HLA-A`*stage, data = df_hla_nk_expression_MSS)
+# Hacemos una contraste de paralelismo de rectas con anova
+anova(lmod_ser)
+```
+
+El efecto principal de HLA-A en NCR1 es significativo (p = 0.004317). Esto 
+significa que hay una relación significativa entre HLA-A y la infiltración de 
+células NK activadas. Dado que el p-valor es menor que 0.01 (**), esto indica 
+una fuerte evidencia contra la hipótesis nula de que HLA-A no tiene un efecto 
+sobre NCR1.  
+
+El efecto de stage en NCR1 no es significativo (p = 0.183005). Esto sugiere que 
+no hay suficiente evidencia para concluir que el estadio tenga un efecto sobre 
+NCR1 cuando se considera solo este factor.
+
+Vemos que hay significación en la hipótesis de paralelismo `HLA-A`:stage 
+(Pr: 0.965735), no son paralelas. La interacción entre HLA-A y stage no es 
+significativa (p = 0.965735). Esto indica que no hay suficiente evidencia para 
+concluir que el efecto de HLA-A sobre NCR1 depende del estadio de la muestra.
+
 # Análisi HALA's con infiltración (MCPcounter) {.tabset .tabset-fade .tabset-pills}
 
 ## Boxplot HLA-A Cat vs 'NK cells'
 
-```{r chunck_HLA_12, fig.width=10, fig.height=10, echo=TRUE}
+```{r chunck_HLA_16, fig.width=10, fig.height=10, echo=TRUE}
 # Generar los gráficos para cada combinación de stage, msi y HLA variable
 bp51 <- boxplot_MWU(data = df_hla_nk_expression, stage = "II", msi = "MSI", hla_var = "HLA_A_cat", nk_var = "NK cells", title_prefix = "StageII")
 bp52 <- boxplot_MWU(data = df_hla_nk_expression, stage = "II", msi = "MSS", hla_var = "HLA_A_cat", nk_var = "NK cells", title_prefix = "StageII")
@@ -1457,7 +1541,7 @@ bp51 + bp52 + bp53 + bp54 + plot_layout(ncol = 2, nrow = 2)
 
 ## Boxplot HLA-B Cat vs 'NK cells'
 
-```{r chunck_HLA_13, fig.width=10, fig.height=10, echo=TRUE}
+```{r chunck_HLA_17, fig.width=10, fig.height=10, echo=TRUE}
 # Generar los gráficos para cada combinación de stage, msi y HLA variable
 bp55 <- boxplot_MWU(data = df_hla_nk_expression, stage = "II", msi = "MSI", hla_var = "HLA_B_cat", nk_var = "NK cells", title_prefix = "StageII")
 bp56 <- boxplot_MWU(data = df_hla_nk_expression, stage = "II", msi = "MSS", hla_var = "HLA_B_cat", nk_var = "NK cells", title_prefix = "StageII")
@@ -1470,7 +1554,7 @@ bp55 + bp56 + bp57 + bp58 + plot_layout(ncol = 2, nrow = 2)
 
 ## Boxplot HLA-C Cat vs 'NK cells'
 
-```{r chunck_HLA_14, fig.width=10, fig.height=10, echo=TRUE}
+```{r chunck_HLA_18, fig.width=10, fig.height=10, echo=TRUE}
 # Generar los gráficos para cada combinación de stage, msi y HLA variable
 bp59 <- boxplot_MWU(data = df_hla_nk_expression, stage = "II", msi = "MSI", hla_var = "HLA_C_cat", nk_var = "NK cells", title_prefix = "StageII")
 bp60 <- boxplot_MWU(data = df_hla_nk_expression, stage = "II", msi = "MSS", hla_var = "HLA_C_cat", nk_var = "NK cells", title_prefix = "StageII")
@@ -1483,7 +1567,7 @@ bp59 + bp60 + bp61 + bp62 + plot_layout(ncol = 2, nrow = 2)
 
 ## Boxplot HLA-E Cat vs 'NK cells'
 
-```{r chunck_HLA_15, fig.width=10, fig.height=10, echo=TRUE}
+```{r chunck_HLA_19, fig.width=10, fig.height=10, echo=TRUE}
 # Generar los gráficos para cada combinación de stage, msi y HLA variable
 bp63 <- boxplot_MWU(data = df_hla_nk_expression, stage = "II", msi = "MSI", hla_var = "HLA_E_cat", nk_var = "NK cells", title_prefix = "StageII")
 bp64 <- boxplot_MWU(data = df_hla_nk_expression, stage = "II", msi = "MSS", hla_var = "HLA_E_cat", nk_var = "NK cells", title_prefix = "StageII")
