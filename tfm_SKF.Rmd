@@ -1933,6 +1933,133 @@ CMS3-Estadio|`r cms3_stage_Accuracy`|`r cms3_stage_Kappa`|(`r cms3_stage_Accurac
 CMS4-Estadio|`r cms4_stage_Accuracy`|`r cms4_stage_Kappa`|(`r cms4_stage_AccuracyLower` - `r cms4_stage_AccuracyUpper`)
 
 
+# ML con los genes MCPcounter {.tabset .tabset-fade .tabset-pills}
+
+Utilizamos de nuevo el algoritmo "Random Forest" para clasificar los CRC pro en este caso utiizaremos solamente los genes que utiliza MCPcounter para caracterizar la infiltración celular inmunitaria.
+
+```{r chunck_ML_MCPc}
+# 25/06/2024
+# Conjunto de genes usados por MCPcounter
+genes_MCPc <- c("CD28", "CD3D", "CD5", "TRAT1", "CD8B", "CD8A", "EOMES", "GNLY", 
+                   "KLRK1", "KIR2DL3", "KIR2DL4", "KIR3DS1", "NCR1", "CD19", 
+                   "CD79A", "CD79B", "MS4A1", "ADAP2", "CSF1R", "RASSF4", "TFEC", 
+                   "CD1A", "CD1B", "CD1E", "CLEC10A", "CEACAM3", "CXCR1", "CXCR2", 
+                   "FCGR3B", "CDH5", "MMRN1", "MMRN2", "VWF", "COL1A1", "COL6A2")
+
+# Comprobamos si están en nuestro data frame
+
+genes_MCPc_presentes <- genes_MCPc %in% colnames(df_exmat_t)
+genes_MCPc_faltantes <- genes_MCPc[!genes_MCPc_presentes]
+
+#Escogemos el data frame con los genes presentes
+df_exmat_t_MCPc <- df_exmat_t[ , colnames(df_exmat_t) %in% genes_MCPc]
+```
+  
+## Estadio
+
+```{r chunck_ML_MCPc_stage}
+# Añadimos la variable "class" que queramos para los modelos ML
+df_exmat_stage_MCPc <- cbind(df_dataClin['stage'], df_exmat_t_MCPc)
+# Cambiamos el nombre de la primera columna a 'class'
+names(df_exmat_stage_MCPc)[1] <- "class"
+# Ejecutamos el modelo Random Forest
+model_results <- run_randomForest_model(df_exmat_stage_MCPc)
+
+# Vemos la información del modelo
+model_results$model
+# Vemos el summary del modelo
+# summary(model_results$model)
+# Vemos los resultados de la Matriz de Confusión de las predicciones (test)
+print(model_results$results)
+
+# Regogemos los datos para comparar de la predicción 
+stage_Accuracy_MCPc <- model_results$results$overall["Accuracy"]
+stage_Kappa_MCPc <- model_results$results$overall["Kappa"]
+stage_AccuracyLower_MCPc <- model_results$results$overall["AccuracyLower"]
+stage_AccuracyUpper_MCPc <- model_results$results$overall["AccuracyUpper"]
+```
+
+## MSI/MSS
+
+```{r chunck_ML_MCPc_msi}
+# Añadimos la variable "class" que queramos para los modelos ML
+df_exmat_msi_MCPc <- cbind(df_dataClin['msi_imputed'], df_exmat_t_MCPc)
+# Cambiamos el nombre de la primera columna a 'class'
+names(df_exmat_msi_MCPc)[1] <- "class"
+# Ejecutamos el modelo Random Forest
+model_results <- run_randomForest_model(df_exmat_msi_MCPc, ntree = 200)
+
+# Vemos la información del modelo
+model_results$model
+# Vemos el summary del modelo
+# summary(model_results$model)
+# Vemos los resultados de la Matriz de Confusión de las predicciones (test)
+print(model_results$results)
+
+# Regogemos los datos para comparar de la predicción 
+msi_Accuracy_MCPc <- model_results$results$overall["Accuracy"]
+msi_Kappa_MCPc <- model_results$results$overall["Kappa"]
+msi_AccuracyLower_MCPc <- model_results$results$overall["AccuracyLower"]
+msi_AccuracyUpper_MCPc <- model_results$results$overall["AccuracyUpper"]
+```
+
+## MSI/MSS-Estadio
+
+```{r chunck_ML_MCPc_msi_mss_stage}
+# Añadimos la variable "class" que queramos para los modelos ML
+df_exmat_msi_stage_MCPc <- cbind(df_dataClin['grupo'], df_exmat_t_MCPc)
+# Cambiamos el nombre de la primera columna a 'class'
+names(df_exmat_msi_stage_MCPc)[1] <- "class"
+# Ejecutamos el modelo Random Forest
+model_results <- run_randomForest_model(df_exmat_msi_stage_MCPc, ntree = 200)
+
+# Vemos la información del modelo
+model_results$model
+# Vemos el summary del modelo
+# summary(model_results$model)
+# Vemos los resultados de la Matriz de Confusión de las predicciones (test)
+print(model_results$results)
+
+# Regogemos los datos para comparar de la predicción 
+msi_mss_stage_Accuracy_MCPc <- model_results$results$overall["Accuracy"]
+msi_mss_stage_Kappa_MCPc <- model_results$results$overall["Kappa"]
+msi_mss_stage_AccuracyLower_MCPc <- model_results$results$overall["AccuracyLower"]
+msi_mss_stage_AccuracyUpper_MCPc <- model_results$results$overall["AccuracyUpper"]
+```
+
+## CMS
+
+```{r chunck_ML_MCPc_cms}
+# Añadimos la variable "class" que queramos para los modelos ML
+df_exmat_cms_MCPc <- cbind(df_dataClin['cms'], df_exmat_t_MCPc)
+# Cambiamos el nombre de la primera columna a 'class'
+names(df_exmat_cms_MCPc)[1] <- "class"
+# Ejecutamos el modelo Random Forest
+model_results <- run_randomForest_model(df_exmat_cms_MCPc)
+
+# Vemos la información del modelo
+model_results$model
+# Vemos el summary del modelo
+# summary(model_results$model)
+# Vemos los resultados de la Matriz de Confusión de las predicciones (test)
+print(model_results$results)
+
+# Regogemos los datos para comparar de la predicción 
+cms_Accuracy_MCPc <- model_results$results$overall["Accuracy"]
+cms_Kappa_MCPc <- model_results$results$overall["Kappa"]
+cms_AccuracyLower_MCPc <- model_results$results$overall["AccuracyLower"]
+cms_AccuracyUpper_MCPc <- model_results$results$overall["AccuracyUpper"]
+```
+
+## Resultados ML con genes MCPc 
+
+Modelo|Accuraccy|kappa|95% CI
+:----|:----|:----:|:----:
+Estadio|`r stage_Accuracy_MCPc`|`r stage_Kappa_MCPc`|(`r stage_AccuracyLower_MCPc` - `r stage_AccuracyUpper_MCPc`)
+MSI/MSS|`r msi_Accuracy_MCPc`|`r msi_Kappa_MCPc`|(`r msi_AccuracyLower_MCPc` - `r msi_AccuracyUpper_MCPc`)
+MSI/MSS-Estadio|`r msi_mss_stage_Accuracy_MCPc`|`r msi_mss_stage_Kappa_MCPc`|(`r msi_mss_stage_AccuracyLower_MCPc` - `r msi_mss_stage_AccuracyUpper_MCPc`)
+CMS|`r cms_Accuracy_MCPc`|`r cms_Kappa_MCPc`|(`r cms_AccuracyLower_MCPc` - `r cms_AccuracyUpper_MCPc`)
+
 # Referencias  
 
 [Repositorio](https://github.com/Sheddad/TFM_Inmunonomica_TME_CRC): [@TFMGithub2024]
