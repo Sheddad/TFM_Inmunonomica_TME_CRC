@@ -2071,7 +2071,7 @@ PC2: "REG4", "ZIC2", "REG1A", "TRIM7", "CTSE", "TCN1", "AGR3", "RAB27B", "SDR16C
 
 
 ```{r chunck_ML_PCA}
-# 25/06/2024
+# 29/06/2024
 # Conjunto de genes usados por PCAounter
 genes_PCA <- c("SFRP2", "GAS1", "COL10A1", "CCL18", "CYP1B1", "SPP1", "GPNMB", "GREM1", "CCDC80", "POSTN", 
                    "REG4", "ZIC2", "REG1A", "TRIM7", "CTSE", "TCN1", "AGR3", "RAB27B", "SDR16C5", "PLA2G2A")
@@ -2190,6 +2190,148 @@ MSI/MSS|`r msi_Accuracy_PCA`|`r msi_Kappa_PCA`|(`r msi_AccuracyLower_PCA` - `r m
 MSI/MSS-Estadio|`r msi_mss_stage_Accuracy_PCA`|`r msi_mss_stage_Kappa_PCA`|(`r msi_mss_stage_AccuracyLower_PCA` - `r msi_mss_stage_AccuracyUpper_PCA`)
 CMS|`r cms_Accuracy_PCA`|`r cms_Kappa_PCA`|(`r cms_AccuracyLower_PCA` - `r cms_AccuracyUpper_PCA`)
 
+
+# ML con los genes MMR (MSI/MSS) {.tabset .tabset-fade .tabset-pills}
+
+Utilizamos de nuevo el algoritmo "Random Forest" para clasificar los CRC pero en este caso usando solo los genes implicados en Inestabilidad de Microsatélites.
+
+Genes implicados en MSI (Inestabilidad de Microsatélites)
+
+MSI se caracteriza por defectos en el sistema de reparación de errores de emparejamiento del ADN (MMR, por sus siglas en inglés). Los genes implicados en MSI incluyen:
+
+    MLH1 (MutL Homolog 1)
+    MSH2 (MutS Homolog 2)
+    MSH6 (MutS Homolog 6)
+    PMS2 (Postmeiotic Segregation Increased 2)
+    EPCAM (Epithelial Cell Adhesion Molecule) - aunque no es un gen MMR, su inactivación puede afectar la expresión de MSH2.
+
+Otros genes y factores implicados en cáncer colorrectal MSI y MSS
+
+Además de los genes MMR, hay otros genes y vías que pueden estar implicados en el cáncer colorrectal, tanto en MSI como en MSS:
+
+    BRAF: Mutaciones en BRAF son comunes en tumores MSI.
+    KRAS: Mutaciones en KRAS pueden ocurrir en ambos tipos de tumores.
+    PIK3CA: Mutaciones en este gen también pueden ser observadas en ambos tipos de tumores.
+    TP53: Mutaciones en TP53 son más comunes en MSS.    
+
+```{r chunck_ML_MMR}
+# 25/06/2024
+# Conjunto de genes usados por MMR + BRAF y TP53
+genes_MMR <- c("MLH1", "MSH2", "MSH6", "PMS2", "EPCAM", "MSH2", "BRAF", "TP53")
+
+# Comprobamos si están en nuestro data frame
+
+genes_MMR_presentes <- genes_MMR %in% colnames(df_exmat_t)
+genes_MMR_faltantes <- genes_MMR[!genes_MMR_presentes]
+
+#Escogemos el data frame con los genes presentes
+df_exmat_t_MMR <- df_exmat_t[ , colnames(df_exmat_t) %in% genes_MMR]
+```
+  
+## Estadio
+
+```{r chunck_ML_MMR_stage}
+# Añadimos la variable "class" que queramos para los modelos ML
+df_exmat_stage_MMR <- cbind(df_dataClin['stage'], df_exmat_t_MMR)
+# Cambiamos el nombre de la primera columna a 'class'
+names(df_exmat_stage_MMR)[1] <- "class"
+# Ejecutamos el modelo Random Forest
+model_results <- run_randomForest_model(df_exmat_stage_MMR)
+
+# Vemos la información del modelo
+model_results$model
+# Vemos el summary del modelo
+# summary(model_results$model)
+# Vemos los resultados de la Matriz de Confusión de las predicciones (test)
+print(model_results$results)
+
+# Regogemos los datos para comparar de la predicción 
+stage_Accuracy_MMR <- model_results$results$overall["Accuracy"]
+stage_Kappa_MMR <- model_results$results$overall["Kappa"]
+stage_AccuracyLower_MMR <- model_results$results$overall["AccuracyLower"]
+stage_AccuracyUpper_MMR <- model_results$results$overall["AccuracyUpper"]
+```
+
+## MSI/MSS
+
+```{r chunck_ML_MMR_msi}
+# Añadimos la variable "class" que queramos para los modelos ML
+df_exmat_msi_MMR <- cbind(df_dataClin['msi_imputed'], df_exmat_t_MMR)
+# Cambiamos el nombre de la primera columna a 'class'
+names(df_exmat_msi_MMR)[1] <- "class"
+# Ejecutamos el modelo Random Forest
+model_results <- run_randomForest_model(df_exmat_msi_MMR, ntree = 200)
+
+# Vemos la información del modelo
+model_results$model
+# Vemos el summary del modelo
+# summary(model_results$model)
+# Vemos los resultados de la Matriz de Confusión de las predicciones (test)
+print(model_results$results)
+
+# Regogemos los datos para comparar de la predicción 
+msi_Accuracy_MMR <- model_results$results$overall["Accuracy"]
+msi_Kappa_MMR <- model_results$results$overall["Kappa"]
+msi_AccuracyLower_MMR <- model_results$results$overall["AccuracyLower"]
+msi_AccuracyUpper_MMR <- model_results$results$overall["AccuracyUpper"]
+```
+
+## MSI/MSS-Estadio
+
+```{r chunck_ML_MMR_msi_mss_stage}
+# Añadimos la variable "class" que queramos para los modelos ML
+df_exmat_msi_stage_MMR <- cbind(df_dataClin['grupo'], df_exmat_t_MMR)
+# Cambiamos el nombre de la primera columna a 'class'
+names(df_exmat_msi_stage_MMR)[1] <- "class"
+# Ejecutamos el modelo Random Forest
+model_results <- run_randomForest_model(df_exmat_msi_stage_MMR, ntree = 200)
+
+# Vemos la información del modelo
+model_results$model
+# Vemos el summary del modelo
+# summary(model_results$model)
+# Vemos los resultados de la Matriz de Confusión de las predicciones (test)
+print(model_results$results)
+
+# Regogemos los datos para comparar de la predicción 
+msi_mss_stage_Accuracy_MMR <- model_results$results$overall["Accuracy"]
+msi_mss_stage_Kappa_MMR <- model_results$results$overall["Kappa"]
+msi_mss_stage_AccuracyLower_MMR <- model_results$results$overall["AccuracyLower"]
+msi_mss_stage_AccuracyUpper_MMR <- model_results$results$overall["AccuracyUpper"]
+```
+
+## CMS
+
+```{r chunck_ML_MMR_cms}
+# Añadimos la variable "class" que queramos para los modelos ML
+df_exmat_cms_MMR <- cbind(df_dataClin['cms'], df_exmat_t_MMR)
+# Cambiamos el nombre de la primera columna a 'class'
+names(df_exmat_cms_MMR)[1] <- "class"
+# Ejecutamos el modelo Random Forest
+model_results <- run_randomForest_model(df_exmat_cms_MMR)
+
+# Vemos la información del modelo
+model_results$model
+# Vemos el summary del modelo
+# summary(model_results$model)
+# Vemos los resultados de la Matriz de Confusión de las predicciones (test)
+print(model_results$results)
+
+# Regogemos los datos para comparar de la predicción 
+cms_Accuracy_MMR <- model_results$results$overall["Accuracy"]
+cms_Kappa_MMR <- model_results$results$overall["Kappa"]
+cms_AccuracyLower_MMR <- model_results$results$overall["AccuracyLower"]
+cms_AccuracyUpper_MMR <- model_results$results$overall["AccuracyUpper"]
+```
+
+## Resultados ML con genes MMR 
+
+Modelo|Accuraccy|kappa|95% CI
+:----|:----|:----:|:----:
+Estadio|`r stage_Accuracy_MMR`|`r stage_Kappa_MMR`|(`r stage_AccuracyLower_MMR` - `r stage_AccuracyUpper_MMR`)
+MSI/MSS|`r msi_Accuracy_MMR`|`r msi_Kappa_MMR`|(`r msi_AccuracyLower_MMR` - `r msi_AccuracyUpper_MMR`)
+MSI/MSS-Estadio|`r msi_mss_stage_Accuracy_MMR`|`r msi_mss_stage_Kappa_MMR`|(`r msi_mss_stage_AccuracyLower_MMR` - `r msi_mss_stage_AccuracyUpper_MMR`)
+CMS|`r cms_Accuracy_MMR`|`r cms_Kappa_MMR`|(`r cms_AccuracyLower_MMR` - `r cms_AccuracyUpper_MMR`)
 
 
 # Referencias  
