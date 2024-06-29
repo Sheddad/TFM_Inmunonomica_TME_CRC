@@ -2060,6 +2060,138 @@ MSI/MSS|`r msi_Accuracy_MCPc`|`r msi_Kappa_MCPc`|(`r msi_AccuracyLower_MCPc` - `
 MSI/MSS-Estadio|`r msi_mss_stage_Accuracy_MCPc`|`r msi_mss_stage_Kappa_MCPc`|(`r msi_mss_stage_AccuracyLower_MCPc` - `r msi_mss_stage_AccuracyUpper_MCPc`)
 CMS|`r cms_Accuracy_MCPc`|`r cms_Kappa_MCPc`|(`r cms_AccuracyLower_MCPc` - `r cms_AccuracyUpper_MCPc`)
 
+
+# ML con los genes PCA {.tabset .tabset-fade .tabset-pills}
+
+Utilizamos de nuevo el algoritmo "Random Forest" para clasificar los CRC pero en este caso usando solo los 10 genes con más peso que utiliza la PCA para su primer y segundo componentes PC1 y PC2.
+
+PC1: "SFRP2", "GAS1", "COL10A1", "CCL18", "CYP1B1", "SPP1", "GPNMB", "GREM1", "CCDC80", "POSTN"
+  
+PC2: "REG4", "ZIC2", "REG1A", "TRIM7", "CTSE", "TCN1", "AGR3", "RAB27B", "SDR16C5", "PLA2G2A"
+
+
+```{r chunck_ML_PCA}
+# 25/06/2024
+# Conjunto de genes usados por PCAounter
+genes_PCA <- c("SFRP2", "GAS1", "COL10A1", "CCL18", "CYP1B1", "SPP1", "GPNMB", "GREM1", "CCDC80", "POSTN", 
+                   "REG4", "ZIC2", "REG1A", "TRIM7", "CTSE", "TCN1", "AGR3", "RAB27B", "SDR16C5", "PLA2G2A")
+
+# Comprobamos si están en nuestro data frame
+
+genes_PCA_presentes <- genes_PCA %in% colnames(df_exmat_t)
+genes_PCA_faltantes <- genes_PCA[!genes_PCA_presentes]
+
+#Escogemos el data frame con los genes presentes
+df_exmat_t_PCA <- df_exmat_t[ , colnames(df_exmat_t) %in% genes_PCA]
+```
+  
+## Estadio
+
+```{r chunck_ML_PCA_stage}
+# Añadimos la variable "class" que queramos para los modelos ML
+df_exmat_stage_PCA <- cbind(df_dataClin['stage'], df_exmat_t_PCA)
+# Cambiamos el nombre de la primera columna a 'class'
+names(df_exmat_stage_PCA)[1] <- "class"
+# Ejecutamos el modelo Random Forest
+model_results <- run_randomForest_model(df_exmat_stage_PCA)
+
+# Vemos la información del modelo
+model_results$model
+# Vemos el summary del modelo
+# summary(model_results$model)
+# Vemos los resultados de la Matriz de Confusión de las predicciones (test)
+print(model_results$results)
+
+# Regogemos los datos para comparar de la predicción 
+stage_Accuracy_PCA <- model_results$results$overall["Accuracy"]
+stage_Kappa_PCA <- model_results$results$overall["Kappa"]
+stage_AccuracyLower_PCA <- model_results$results$overall["AccuracyLower"]
+stage_AccuracyUpper_PCA <- model_results$results$overall["AccuracyUpper"]
+```
+
+## MSI/MSS
+
+```{r chunck_ML_PCA_msi}
+# Añadimos la variable "class" que queramos para los modelos ML
+df_exmat_msi_PCA <- cbind(df_dataClin['msi_imputed'], df_exmat_t_PCA)
+# Cambiamos el nombre de la primera columna a 'class'
+names(df_exmat_msi_PCA)[1] <- "class"
+# Ejecutamos el modelo Random Forest
+model_results <- run_randomForest_model(df_exmat_msi_PCA, ntree = 200)
+
+# Vemos la información del modelo
+model_results$model
+# Vemos el summary del modelo
+# summary(model_results$model)
+# Vemos los resultados de la Matriz de Confusión de las predicciones (test)
+print(model_results$results)
+
+# Regogemos los datos para comparar de la predicción 
+msi_Accuracy_PCA <- model_results$results$overall["Accuracy"]
+msi_Kappa_PCA <- model_results$results$overall["Kappa"]
+msi_AccuracyLower_PCA <- model_results$results$overall["AccuracyLower"]
+msi_AccuracyUpper_PCA <- model_results$results$overall["AccuracyUpper"]
+```
+
+## MSI/MSS-Estadio
+
+```{r chunck_ML_PCA_msi_mss_stage}
+# Añadimos la variable "class" que queramos para los modelos ML
+df_exmat_msi_stage_PCA <- cbind(df_dataClin['grupo'], df_exmat_t_PCA)
+# Cambiamos el nombre de la primera columna a 'class'
+names(df_exmat_msi_stage_PCA)[1] <- "class"
+# Ejecutamos el modelo Random Forest
+model_results <- run_randomForest_model(df_exmat_msi_stage_PCA, ntree = 200)
+
+# Vemos la información del modelo
+model_results$model
+# Vemos el summary del modelo
+# summary(model_results$model)
+# Vemos los resultados de la Matriz de Confusión de las predicciones (test)
+print(model_results$results)
+
+# Regogemos los datos para comparar de la predicción 
+msi_mss_stage_Accuracy_PCA <- model_results$results$overall["Accuracy"]
+msi_mss_stage_Kappa_PCA <- model_results$results$overall["Kappa"]
+msi_mss_stage_AccuracyLower_PCA <- model_results$results$overall["AccuracyLower"]
+msi_mss_stage_AccuracyUpper_PCA <- model_results$results$overall["AccuracyUpper"]
+```
+
+## CMS
+
+```{r chunck_ML_PCA_cms}
+# Añadimos la variable "class" que queramos para los modelos ML
+df_exmat_cms_PCA <- cbind(df_dataClin['cms'], df_exmat_t_PCA)
+# Cambiamos el nombre de la primera columna a 'class'
+names(df_exmat_cms_PCA)[1] <- "class"
+# Ejecutamos el modelo Random Forest
+model_results <- run_randomForest_model(df_exmat_cms_PCA)
+
+# Vemos la información del modelo
+model_results$model
+# Vemos el summary del modelo
+# summary(model_results$model)
+# Vemos los resultados de la Matriz de Confusión de las predicciones (test)
+print(model_results$results)
+
+# Regogemos los datos para comparar de la predicción 
+cms_Accuracy_PCA <- model_results$results$overall["Accuracy"]
+cms_Kappa_PCA <- model_results$results$overall["Kappa"]
+cms_AccuracyLower_PCA <- model_results$results$overall["AccuracyLower"]
+cms_AccuracyUpper_PCA <- model_results$results$overall["AccuracyUpper"]
+```
+
+## Resultados ML con genes PCA 
+
+Modelo|Accuraccy|kappa|95% CI
+:----|:----|:----:|:----:
+Estadio|`r stage_Accuracy_PCA`|`r stage_Kappa_PCA`|(`r stage_AccuracyLower_PCA` - `r stage_AccuracyUpper_PCA`)
+MSI/MSS|`r msi_Accuracy_PCA`|`r msi_Kappa_PCA`|(`r msi_AccuracyLower_PCA` - `r msi_AccuracyUpper_PCA`)
+MSI/MSS-Estadio|`r msi_mss_stage_Accuracy_PCA`|`r msi_mss_stage_Kappa_PCA`|(`r msi_mss_stage_AccuracyLower_PCA` - `r msi_mss_stage_AccuracyUpper_PCA`)
+CMS|`r cms_Accuracy_PCA`|`r cms_Kappa_PCA`|(`r cms_AccuracyLower_PCA` - `r cms_AccuracyUpper_PCA`)
+
+
+
 # Referencias  
 
 [Repositorio](https://github.com/Sheddad/TFM_Inmunonomica_TME_CRC): [@TFMGithub2024]
