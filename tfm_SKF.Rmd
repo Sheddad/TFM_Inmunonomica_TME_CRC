@@ -880,7 +880,7 @@ bp12 <- boxplot_MCPcounter (exmat_MCP_Clin, exmat_MCP_Clin$stage,
                             "NK cells II vs III", mwU_NK_stage_test$p.value)
 
 # En un grid 2x2 (patchwork)
-p4 + bp1 + p1+ bp11 + p3 + bp12 + plot_layout(ncol = 2, nrow = 3)
+p3 + bp1 + p2+ bp11 + p1 + bp12 + plot_layout(ncol = 2, nrow = 3)
 ```
 
 ## Infiltración resto de tipos celulares {.tabset .tabset-fade}
